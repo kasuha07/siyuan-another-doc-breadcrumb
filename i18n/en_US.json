@@ -10,7 +10,7 @@
     "setting_showRoot_name": "Show the root level in document breadcrumb",
     "setting_showRoot_desp": "",
     "setting_oneLineBreadcrumb_name": "🧪Display the document breadcrumb on the same line as the block breadcrumb",
-    "setting_oneLineBreadcrumb_desp": "(Recommended to disable during functional side effect reassessment)",
+    "setting_oneLineBreadcrumb_desp": "(Deprecated)",
     "setting_foldedFrontShow_name": "Keep the first N documents",
     "setting_foldedFrontShow_desp": "",
     "setting_foldedEndShow_name": "Keep the last N documents",
@@ -70,6 +70,11 @@
     "nothingToDisplay": "Nothing to show",
     "previous_doc": "Previous document",
     "next_doc": "Next document",
+
+    "update_title": "Fake Doc Breadcrumb Plugin Updated",
+    "update_content": "<p>We plan to deprecate the \"Display the document breadcrumb on the same line as the block breadcrumb\" feature. The plugin has detected that you are using this feature. You can go to the discussion page to provide feedback: <a href=\"https://github.com/OpaqueGlass/syplugin-fakeDocBreadcrumb/issues/40\">https://github.com/OpaqueGlass/syplugin-fakeDocBreadcrumb/issues/40</a></p>",
+    "update_confirm": "I Understand",
+    "update_canel": "I don't care",
 
     "root": "/",
     "workspace": "Workspace",

@@ -6,7 +6,7 @@ const siyuan = require('siyuan');
 // /** @type {import('./utils.js').Utils} */
 // let utils_;
 // const _utils = import('/plugins/syplugin-fakeDocBreadcrumb/utils.js').then(res=>{
-//     console.error("hello", res);
+//     console.error("hello myutils", res);
 //     utils_ = res.default;
 // });
 
@@ -71,6 +71,7 @@ let g_setting = {
     "createDocBtnInMenu": null,
 };
 let g_setting_default = {
+    "@version": 20260705,
     "nameMaxLength": 15,
     "docMaxNum": 128,
     "showNotebook": true,
@@ -90,7 +91,6 @@ let g_setting_default = {
     "swapClickFunction": false,
     "showRoot": false,
     "showAdjacentDocButton": CONSTANTS.ADJ_SAME_LEVEL,
-    "@version": 20260525,
     "autoFixFocusError": false,
     "createDocBtnInMenu": false,
 };
@@ -126,21 +126,29 @@ class FakeDocBreadcrumb extends siyuan.Plugin {
                 if (settingCache["@version"]) {
                     if (settingCache["@version"] < g_setting_default["@version"]) {
                         debugPush("配置版本过旧");
-                        settingCache["@version"] = g_setting_default["@version"];
                         resetFlag = true;
                     }
-                } else {
+                } else if (settingCache["@version"] === undefined) {
                     resetFlag = true;
                 }
                 if (resetFlag) {
+                    settingCache["@version"] = g_setting_default["@version"];
                     if (settingCache["showAdjacentDocButton"] === true) {
                         settingCache["showAdjacentDocButton"] = CONSTANTS.ADJ_SAME_LEVEL;
                     } else if (settingCache["showAdjacentDocButton"] === false) {
                         settingCache["showAdjacentDocButton"] = CONSTANTS.ADJ_NONE;
                     }
+                    if (settingCache["oneLineBreadcrumb"] === true) {
+                        showDialog({
+                            "title": language["update_title"],
+                            "content": language["update_content"],
+                            "confirmText": language["update_confirm"],
+                            "cancelText": language["update_cancel"],
+                        });
+                    }
                     this.saveData(`settings.json`, JSON.stringify(settingCache));
                 }
-                debugPush("载入配置", settingCache);    
+                debugPush("载入配置", settingCache);
                 // let settingData = JSON.parse(settingCache);
                 Object.assign(g_setting, settingCache);
                 this.eventBusInnerHandler();
@@ -209,8 +217,6 @@ class FakeDocBreadcrumb extends siyuan.Plugin {
         settingForm.setAttribute("name", CONSTANTS.PLUGIN_NAME);
         settingForm.appendChild(generateSettingPanel([
             new SettingProperty("RESERVE_HINT", "HINT", null),
-            new SettingProperty("autoFixFocusError", "SWITCH"),
-            new SettingProperty("batchFixFocusError", "BUTTON", null, tryToFixAllError),
             new SettingProperty("docMaxNum", "NUMBER", [0, 1024]),
             new SettingProperty("nameMaxLength", "NUMBER", [0, 1024]),
             new SettingProperty("showNotebook", "SWITCH", null),
@@ -420,7 +426,7 @@ async function mainEventBusHander(detail) {
             }
         }
     }
-    fixbug();
+    // fixbug();
     // 处理menu
     addBlockBdMenuListener(protyle.element, protyle.block.rootID, protyle);
 }
@@ -915,6 +921,7 @@ function setAndApply(finalElement, docId, eventProtyle) {
         const elem = protyleElem.querySelector(`.protyle-breadcrumb__bar`);
         if (elem) {
             elem.insertAdjacentElement("beforebegin", finalElement);
+            finalElement.insertAdjacentElement("afterend",document.createElement("div")).classList.add("og-breadcrumb-oneline-divider");
         }else{
             debugPush("可能是由于没有焦点不再文档上");
         }
@@ -1495,6 +1502,35 @@ function setStyle() {
         margin-right: 3px;
         overflow-x: auto; /* 滚动查看，oneline套了一层div所以也得加overflow */
         flex-shrink: 0.5; /* 块面包屑过长时避免大范围占用文档面包屑 */
+        flex: 1 1 max-content;
+    }
+    /* 分隔线使用，定位到目标容器 */
+    .protyle-breadcrumb .og-fake-doc-breadcrumb-container.og-breadcrumb-oneline {
+        position: relative;
+    }
+    /* 使用伪元素作为分隔线
+    .protyle-breadcrumb .og-fake-doc-breadcrumb-container.og-breadcrumb-oneline::after {
+        content: "";
+        display: block;
+        width: 2px;
+        height: 1px;
+        background-color: var(--b3-theme-on-surface-light);
+        position: absolute;
+        bottom: -4px; 
+        left: 0;
+    } */
+    .og-breadcrumb-oneline-divider {
+        background-color: var(--b3-theme-on-surface-light);
+        flex-shrink: 0;      /* 防止在 flex 布局中被压缩 */
+        align-self: stretch; /* 确保宽度撑满父容器 */
+        margin: 4px;
+        width: 1px;
+        height: 80%;
+        align-self: center;
+    }
+
+    .og-breadcrumb-oneline + .protyle-breadcrumb__bar {
+        flex: 1 1 max-content;
     }
 
     .og-fake-doc-breadcrumb-container .protyle-breadcrumb__item[data-og-type="NOTEBOOK"] {
@@ -2558,6 +2594,70 @@ function trimListDocsByPathAPIReturnedDocName(docName) {
     } else {
         return docName;
     }
+}
+
+
+/**
+ * 创建一个 Dialog（对话框），仿照思源插件中 Dialog 的调用方式
+ *
+ * @param {object} options - 对话框配置
+ * @param {string} options.title - 对话框标题
+ * @param {string} options.content - 对话框内容 HTML（将放入 b3-dialog__content 中）
+ * @param {string} [options.confirmText="OK"] - 确认按钮文案
+ * @param {Function} [options.confirmCallback] - 确认回调，点击确认后先执行回调再关闭 Dialog
+ * @param {string} [options.cancelText="Cancel"] - 取消按钮文案
+ * @param {Function} [options.cancelCallback] - 取消回调，点击取消后先执行回调再关闭 Dialog
+ * @param {string} [options.width] - 对话框宽度（如 "520px", "80vw"），默认移动端 "92vw"，桌面端 "520px"
+ * @param {string} [options.height] - 对话框高度（如 "80vh"），默认不限制
+ * @returns {siyuan.Dialog} 创建的 Dialog 实例，可继续操作
+ */
+function showDialog(options) {
+    const {
+        title,
+        content,
+        confirmText = "OK",
+        confirmCallback,
+        cancelText = "Cancel",
+        cancelCallback,
+        width,
+        height,
+    } = options;
+
+    const dialogWidth = width || (isMobile() ? "92vw" : "520px");
+
+    const dialog = new siyuan.Dialog({
+        title: title,
+        content: `
+        <div class="b3-dialog__content" style="flex: 1;">
+            ${content}
+        </div>
+        <div class="b3-dialog__action" style="max-height: 40px">
+            <button class="b3-button b3-button--cancel">${cancelText}</button>
+            <div class="fn__space"></div>
+            <button class="b3-button b3-button--text">${confirmText}</button>
+        </div>
+        `,
+        width: dialogWidth,
+        height: height,
+    });
+
+    const actionButtons = dialog.element.querySelectorAll('.b3-dialog__action button');
+    // 取消按钮
+    actionButtons[0].addEventListener("click", () => {
+        if (cancelCallback) {
+            cancelCallback(dialog);
+        }
+        dialog.destroy();
+    });
+    // 确认按钮
+    actionButtons[1].addEventListener("click", () => {
+        if (confirmCallback) {
+            confirmCallback(dialog);
+        }
+        dialog.destroy();
+    });
+
+    return dialog;
 }
 
 module.exports = {
