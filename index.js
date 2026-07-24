@@ -541,7 +541,8 @@ function sleep(time){
 }
 
 async function parseDocPath(docDetail) {
-    let pathArray = docDetail.path.substring(0, docDetail.path.length - 3).split("/");
+    let docPath = getListDocsByPathAPIFilePath(docDetail.path, docDetail.box);
+    let pathArray = docPath.substring(0, docPath.length - 3).split("/");
     // 处理并发意外
     let hpath = docDetail.hpath ?? await getHPathByID(docDetail.docId);
     let hpathArray = hpath.split("/");
@@ -611,11 +612,14 @@ async function generateElement(pathObjects, docId, protyle) {
     `;
     let htmlStr = "";
     let countDebug = 0;
+    const notebookId = protyle.notebookId;
+    const notebookDocFlag = isNotebookDoc(protyle.path, notebookId);
     // 折叠隐藏自
     const foldStartAt = g_setting.showNotebook ? g_setting.foldedFrontShow : 
         g_setting.foldedFrontShow + 1;
     // 折叠隐藏结束于
     const foldEndAt = pathObjects.length - g_setting.foldedEndShow - 1;
+    // 不可点击的笔记本层级
     if (g_setting.showRoot) {
         htmlStr += oneItem.replaceAll("%0%", "")
                 .replaceAll("%1%", language["workspace"])
@@ -642,7 +646,13 @@ async function generateElement(pathObjects, docId, protyle) {
             let hidedNames = new Array();
             let hideFrom = foldStartAt;
             // 过滤笔记本，因为笔记本不可点击
-            if (hideFrom <= 0) hideFrom = 1;
+            if (hideFrom <= 0) {
+                if (isNotebookDocEnabled()) {
+                    hideFrom = 0;
+                } else {
+                    hideFrom = 1;
+                }
+            }
             for (let j = hideFrom;
                  j <= foldEndAt; j++) {
                 hidedIds.push(pathObjects[j].id);
@@ -706,7 +716,7 @@ async function generateElement(pathObjects, docId, protyle) {
     barElement.innerHTML = htmlStr;
     let adjacentElement = null;
     if (g_setting.showAdjacentDocButton !== CONSTANTS.ADJ_NONE) {
-        adjacentElement = await generateAdjacentDocNav(pathObjects);
+        adjacentElement = await generateAdjacentDocNav(pathObjects, notebookDocFlag);
     }
     if (g_setting.oneLineBreadcrumb && g_setting.showAdjacentDocButton !== CONSTANTS.ADJ_NONE && adjacentElement) {
         barElement.appendChild(adjacentElement);
@@ -716,7 +726,7 @@ async function generateElement(pathObjects, docId, protyle) {
         let spaceElement = document.createElement("span");
         spaceElement.classList.add("protyle-breadcrumb__space", "og-fdb-adjacent-doc-nav-space-before");
         result.appendChild(spaceElement);
-        adjacentElement = await generateAdjacentDocNav(pathObjects);
+        // adjacentElement = await generateAdjacentDocNav(pathObjects);
         result.appendChild(adjacentElement);
     }
 
@@ -742,10 +752,10 @@ async function generateElement(pathObjects, docId, protyle) {
 }
 
 // [START] 相邻文档导航相关
-async function generateAdjacentDocNav(pathObjects) {
+async function generateAdjacentDocNav(pathObjects, notebookDocFlag) {
     const navElement = document.createElement("span");
     navElement.className = "og-fdb-doc-nav";
-    const adjacentDocs = await getAdjacentDocs(pathObjects);
+    const adjacentDocs = await getAdjacentDocs(pathObjects, notebookDocFlag);
     navElement.appendChild(createAdjacentDocButton("previous", adjacentDocs.previousDoc, adjacentDocs.sameLevelPrevious));
     navElement.appendChild(createAdjacentDocButton("next", adjacentDocs.nextDoc, adjacentDocs.sameLevelNext));
     return navElement;
@@ -803,30 +813,37 @@ function trimDocName(name, maxLength) {
     return name.substring(0, g_setting.nameMaxLength) + "...";
 }
 
-async function getAdjacentDocs(pathObjects) {
+async function getAdjacentDocs(pathObjects, notebookDocFlag) {
     const result = {
         previousDoc: null,
         nextDoc: null,
         sameLevelPrevious: false,
         sameLevelNext: false,
     };
-    if (!Array.isArray(pathObjects) || pathObjects.length <= 1) {
+    // 如果是笔记本层级，且当前文档是笔记本文档，也继续
+    if (!Array.isArray(pathObjects) || (pathObjects.length <= 1 && !notebookDocFlag)) {
         return result;
     }
     const currentDoc = pathObjects[pathObjects.length - 1];
     const previousDoc = pathObjects[pathObjects.length - 2];
     const currentDepth = pathObjects.length - 1;
-    const sameLevelDocs = await getAdjacentChildDocs(previousDoc);
+    let sameLevelDocs = null;
+    if (notebookDocFlag) {
+        sameLevelDocs = await getNotebookAdjacentDocs(currentDoc.box);
+    } else {
+        sameLevelDocs = await getAdjacentChildDocs(previousDoc);
+    }
     const currentIndex = findAdjacentDocIndex(sameLevelDocs, currentDoc.id);
     if (currentIndex < 0) {
         return result;
     }
     result.previousDoc = sameLevelDocs[currentIndex - 1] ?? null;
     result.nextDoc = sameLevelDocs[currentIndex + 1] ?? null;
+    // 如果是笔记本层级，不再寻找同层级——已经到头了
     if (g_setting.showAdjacentDocButton === CONSTANTS.ADJ_SAME_LEVEL
-        && (!result.previousDoc || !result.nextDoc)
+        && (!result.previousDoc || !result.nextDoc) && !notebookDocFlag
     ) {
-        debugPush("当前文档同级没有足够的文档，尝试获取同层级文档");
+        debugPush("当前文档同级没有足够的文档，尝试向上获取同层级文档");
         const cache = {};
         const sameLevelDocs = await getAdjacentDocsByDepth(pathObjects[0], currentDepth, cache);
         const currentIndex = findAdjacentDocIndex(sameLevelDocs, currentDoc.id);
@@ -843,6 +860,43 @@ async function getAdjacentDocs(pathObjects) {
 }
 
 let g_adjacentDocCache = {};
+
+/**
+ * 获取笔记本的相邻文档
+ * @param {*} notebookId 
+ * @param {*} cache 
+ * @returns 
+ */
+async function getNotebookAdjacentDocs(notebookId, cache = null) {
+    if (!notebookId) {
+        return [];
+    }
+    const cacheKey = `notebook-${notebookId}`;
+    if (cache && cache[cacheKey]) {
+        debugPush("使用传入缓存", cacheKey);
+        return cache[cacheKey].data;
+    }
+    if (g_adjacentDocCache[cacheKey] && (Date.now() - g_adjacentDocCache[cacheKey].timestamp < 3 * 60 * 1000) && g_setting.immediatelyUpdate) {
+        debugPush("使用笔记本文档缓存", cacheKey);
+        return g_adjacentDocCache[cacheKey].data;
+    }
+    const notebookList = await getNodebookList() ?? [];
+    const result = notebookList.filter(notebook=>notebook.closed==false);
+    // 面包屑情况下不太需要详细信息，这里先不调用信息补全了
+    // await fillNotebookDocFileInfo(notebookList.filter(notebook=>notebook.closed==false));
+    if (cache) {
+        cache[cacheKey] = {
+            "data": result,
+            "timestamp": Date.now(),
+        };
+    }
+    g_adjacentDocCache[cacheKey] = {
+        "data": result,
+        "timestamp": Date.now(),
+    };
+    return g_adjacentDocCache[cacheKey].data;
+}
+
 
 async function getAdjacentChildDocs(parentDoc, cache = null) {
     if (!parentDoc?.path || !parentDoc?.box) {
@@ -1009,7 +1063,7 @@ function clickBreadcrumbItemAgent(type, protyleElem, event) {
     event.preventDefault();
     event.stopPropagation();
     if (g_setting.swapClickFunction) {
-        if (event.button == 2 && type === "FILE") {
+        if (event.button == 2 && (type === "FILE" || (isNotebookDocEnabled() && type === "NOTEBOOK"))) {
             openRefLinkAgent(event, null, null, protyleElem);
         } else if (event.button != 2) {
             openRelativeMenu(protyleElem, event);
@@ -1017,7 +1071,7 @@ function clickBreadcrumbItemAgent(type, protyleElem, event) {
     } else {
         if (event.button == 2) {
             openRelativeMenu(protyleElem, event);
-        } else if (type == "FILE") {
+        } else if (type == "FILE" || (isNotebookDocEnabled() && type === "NOTEBOOK")) {
             openRefLinkAgent(event, null, null, protyleElem);
         }
     }
@@ -1177,7 +1231,7 @@ async function openRelativeMenu(protyleElem, event) {
                 ${trimedName}
             </span>`;
         }
-        if (type !== "ROOT") {
+        if (type !== "ROOT" || isNotebookDocEnabled()) {
              tempMenuItemObj.click = (htmlElement, event) => {
                 let docId = htmlElement.querySelector("[data-doc-id]")?.getAttribute("data-doc-id");
                 event.preventDefault();
@@ -1399,6 +1453,15 @@ function getNotebooks() {
     return notebooks;
 }
 
+async function getNodebookList() {
+    let url = "/api/notebook/lsNotebooks";
+    let response = await postRequest({}, url);
+    if (response.code == 0 && response.data != null && "notebooks" in response.data){
+        return response.data.notebooks;
+    }
+    return null;
+}
+
 
 async function getCurrentDocDetail(docId, protyle) {
     let result = {
@@ -1430,6 +1493,17 @@ async function listDocTree(notebook, path) {
     } else {
         throw new Error("listDocTree Failed: " + response.msg);
     }
+}
+
+async function getNotebookInfo(notebookId) {
+    let url = "/api/notebook/getNotebookInfo";
+    let response = await postRequest({notebook: notebookId}, url);
+    if (response.code == 0 && response.data != null){
+        return response.data.boxInfo;
+    } else {
+        warnPush("请求笔记本信息时出错  ", response["msg"])
+    }
+    return null;
 }
 
 async function getChildDocuments(docId, sqlResult) {
@@ -1534,7 +1608,7 @@ function setStyle() {
     }
 
     .og-fake-doc-breadcrumb-container .protyle-breadcrumb__item[data-og-type="NOTEBOOK"] {
-        cursor: default;
+        ${isNotebookDocEnabled() ? '' : 'cursor: default;'};
         /*pointer-events: none;*/
     }
 
@@ -2659,6 +2733,57 @@ function showDialog(options) {
 
     return dialog;
 }
+
+// 兼容性utils
+function isNotebookDocEnabled(){
+    if (window.top.siyuan.config?.fileTree.boxDocEnabled === undefined) {
+        return false;
+    }
+    return window.top.siyuan.config.fileTree.boxDocEnabled;
+}
+
+function isNotebookDoc(path, notebookId) {
+    if (!isNotebookDocEnabled()) {
+        return false;
+    }
+    if (path == null || notebookId == null) {
+        return false;
+    }
+    if (path.substring(1, path.length - 3) === notebookId) {
+        return true;
+    }
+    return false;
+}
+
+/**
+ * 获取用于获取子文档的文档路径
+ * v3.7.3+版本，在启用笔记本文档的情况下，返回的笔记本文档路径为"/xxx.sy"，但笔记本下直接文档仍然使用"/"参数
+ * @param fullPath 
+ * @returns 
+ */
+function getListDocsByPathAPIFilePath(fullPath, notbookId) {
+    if (fullPath == null) {
+        return null;
+    }
+    if (isNotebookDocEnabled() && isNotebookDoc(fullPath, notbookId)) {
+        return "/";
+    }
+    return fullPath;
+}
+
+async function fillNotebookDocFileInfo(notebookList) {
+    const promiseList = notebookList.filter(notebook=>notebook.closed==false).map(async (notebook)=>{
+        const notebookInfo = await getNotebookInfo(notebook.id);
+        if (notebookInfo != null) {
+            delete notebookInfo["name"];
+            Object.assign(notebook, notebookInfo)
+        }
+        return notebook;
+    });
+    const result = await Promise.all(promiseList);
+    return result.filter((doc) => doc !== null);
+}
+
 
 module.exports = {
     default: FakeDocBreadcrumb,
