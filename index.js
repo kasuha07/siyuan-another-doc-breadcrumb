@@ -960,6 +960,7 @@ function setAndApply(finalElement, docId, eventProtyle) {
     const protyleElem = eventProtyle.element;
     // 移除已有的面包屑
     const tempOldElem = protyleElem.querySelector(`.og-fake-doc-breadcrumb-container`);
+    protyleElem.querySelector(`.og-breadcrumb-oneline-divider`)?.remove();
     debugPush("setAndApply定位原有面包屑全部匹配结果", protyleElem.querySelectorAll(`.og-fake-doc-breadcrumb-container`));
     debugPush("setAndApply定位文档位置全部匹配结果", protyleElem.querySelectorAll(`.protyle-breadcrumb__bar`));
     if (tempOldElem) {
