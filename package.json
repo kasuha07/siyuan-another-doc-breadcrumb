@@ -4,7 +4,7 @@
   "description": "[中文](README_zh_CN.md) | **English**",
   "main": "index.js",
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && node scripts/copy-assets.js",
     "verify": "node scripts/verify.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },

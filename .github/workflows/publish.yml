@@ -24,7 +24,7 @@ jobs:
         run: npm ci && npm run build
 
       - name: Generate Package.zip
-        run: find . -not -path '*/\..*' -not -path './node_modules*' -not -path './scripts*' -print | xargs zip package.zip
+        run: cd dist && zip -r ../package.zip .
 
 
       - name: Set up Python
