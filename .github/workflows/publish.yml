@@ -15,6 +15,14 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Build
+        run: npm ci && npm run build
+
       - name: Generate Package.zip
         run: find . -not -path '*/\..*' -not -path './node_modules*' -not -path './scripts*' -print | xargs zip package.zip
 
