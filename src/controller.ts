@@ -70,6 +70,34 @@ export function createInlineRoot() {
 }
 
 /**
+ * 同行模式超长省略（模拟思源原生 improveBreadcrumbAppearance）：
+ * 原生逻辑是内容换行（scrollHeight > 30）时从前往后逐个给文本加
+ * --ellipsis class（max-width: 112px 省略号截断）；同行模式为 nowrap
+ * 永不换行，原生逻辑不会触发，这里改用横向溢出（scrollWidth > clientWidth）
+ * 判断，同样逐个压缩文本，直到不再溢出；全部压缩后仍放不下则保留滚动。
+ */
+export function applyBreadcrumbEllipsis(bar: HTMLElement) {
+    if (!bar.isConnected) {
+        return;
+    }
+    const textElements = Array.from(bar.querySelectorAll(".protyle-breadcrumb__text"));
+    if (textElements.length <= 1) {
+        return;
+    }
+    // 先清除旧标记：容器变宽后需重新完整显示，再按当前宽度重算
+    textElements.forEach((item) => {
+        item.classList.remove("protyle-breadcrumb__text--ellipsis");
+    });
+    while (bar.scrollWidth > bar.clientWidth) {
+        const target = textElements.find((item) => !item.classList.contains("protyle-breadcrumb__text--ellipsis"));
+        if (!target) {
+            break;
+        }
+        target.classList.add("protyle-breadcrumb__text--ellipsis");
+    }
+}
+
+/**
  * 滚动位置捕获与恢复
  */
 export function captureScrollState(element: HTMLElement) {
@@ -104,6 +132,7 @@ export class InlineBreadcrumbController {
     lastRenderedDocId = "";
     lastModel: BreadcrumbModel | null = null;
     contentObserver: MutationObserver | null = null;
+    resizeObserver: ResizeObserver | null = null;
     root: HTMLElement | null = null;
     wrapper: HTMLElement | null = null;
     host: HTMLElement | null = null;
@@ -160,6 +189,14 @@ export class InlineBreadcrumbController {
             this.root = createInlineRoot();
             parts.nativeBar.insertBefore(this.root, parts.nativeBar.firstElementChild);
             this.startContentRestore();
+            // 容器宽度变化（窗口缩放、侧栏开关、分屏拖拽）时重算省略
+            this.resizeObserver = new ResizeObserver(() => {
+                if (!this.nativeBar?.isConnected) {
+                    return;
+                }
+                applyBreadcrumbEllipsis(this.nativeBar);
+            });
+            this.resizeObserver.observe(this.host);
         } else {
             // 两行模式：插件容器是原生 host 前一个独立 .protyle-breadcrumb
             this.wrapper = document.createElement("div");
@@ -238,6 +275,11 @@ export class InlineBreadcrumbController {
             }
         }
         this.nativeBar.insertBefore(this.root, this.nativeBar.firstElementChild);
+
+        // 同行模式：空间不足时恢复思源原生省略机制（先压缩再计算宽度补偿）
+        if (this.nativeBar) {
+            applyBreadcrumbEllipsis(this.nativeBar);
+        }
 
         // 内容带前段重新插入插件内容后，把滚动位置向后推相应宽度，
         // 保持用户当前看到的块位置不变
@@ -485,6 +527,11 @@ export class InlineBreadcrumbController {
             this.root.appendChild(createBreadcrumbDivider());
         }
 
+        // 同行模式：空间不足时恢复思源原生省略机制
+        if (this.nativeBar) {
+            applyBreadcrumbEllipsis(this.nativeBar);
+        }
+
         // 首次渲染或文档切换：滚到最右端；同文档刷新：保留原位置
         restoreScrollState(scroller as HTMLElement, scrollState, forceEnd);
     }
@@ -492,6 +539,7 @@ export class InlineBreadcrumbController {
     destroy() {
         this.revision += 1;
         this.contentObserver?.disconnect();
+        this.resizeObserver?.disconnect();
         this.abortController.abort();
         this.actions.clear();
 

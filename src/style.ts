@@ -72,11 +72,13 @@ export function setStyle() {
     flex-shrink: 0;
 }
 
-/* 兼容原生 bar 已被加上 ellipsis class 的情况 */
+/* 同行模式超长省略：空间不足时由 JS 逐个给文本加 --ellipsis，
+ * 恢复思源原生省略机制（原生规则 max-width: 112px 省略号截断），
+ * 不再覆盖为 none；省略后仍放不下时保留横向滚动。 */
 .protyle-breadcrumb.og-fdb-inline-host
     > .protyle-breadcrumb__bar
     .protyle-breadcrumb__text--ellipsis {
-    max-inline-size: none;
+    max-inline-size: 112px;
 }
 
 /* 不修改 .protyle-breadcrumb__space，只禁止其右侧按钮被压缩 */
@@ -114,6 +116,13 @@ export function setStyle() {
     max-inline-size: none;
     overflow: visible;
     text-overflow: clip;
+}
+
+/* 插件文本的省略态：覆盖上一条的 no-ellipsis 属性，与原生 112px 规则一致 */
+.og-fdb-inline-breadcrumb .protyle-breadcrumb__text.protyle-breadcrumb__text--ellipsis {
+    max-inline-size: 112px;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 /* 两行模式容器 */
