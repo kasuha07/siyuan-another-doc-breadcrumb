@@ -230,6 +230,13 @@ export function setStyle() {
     flex-shrink: 0;
 }
 
+/* 同行模式：相邻导航固定于 host 右侧按钮组（space 之后、原生按钮之前），
+ * 不参与 bar 内容带滚动；紧贴原生按钮组，压缩 margin 并垂直居中。 */
+.protyle-breadcrumb.og-fdb-inline-host > .og-fdb-doc-nav {
+    align-self: center;
+    margin-left: 2px;
+}
+
 .og-fdb-doc-nav-button {
     align-items: center;
     background: transparent;

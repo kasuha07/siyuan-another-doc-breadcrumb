@@ -123,7 +123,7 @@ export function setMouseKeyboardListener() {
 export function hideDocBreadcrumb(event: any) {
     if (!state.g_hidedBreadcrumb) {
         if (event.ctrlKey || event.shiftKey || event.altKey) return;
-        const fakeBreadcrumb = window.document.querySelectorAll(`.${CONSTANTS.CONTAINER_CLASS_NAME}, .${CONSTANTS.INLINE_BREADCRUMB_CLASS_NAME}`);
+        const fakeBreadcrumb = window.document.querySelectorAll(`.${CONSTANTS.CONTAINER_CLASS_NAME}, .${CONSTANTS.INLINE_BREADCRUMB_CLASS_NAME}, .og-fdb-doc-nav`);
         [].forEach.call(fakeBreadcrumb, (e: HTMLElement) => {
             e.classList.add("og-hide-breadcrumb");
         });
@@ -133,7 +133,7 @@ export function hideDocBreadcrumb(event: any) {
 
 export function showDocBreadcrumb() {
     if (state.g_hidedBreadcrumb) {
-        const fakeBreadcrumb = window.document.querySelectorAll(`.${CONSTANTS.CONTAINER_CLASS_NAME}, .${CONSTANTS.INLINE_BREADCRUMB_CLASS_NAME}`);
+        const fakeBreadcrumb = window.document.querySelectorAll(`.${CONSTANTS.CONTAINER_CLASS_NAME}, .${CONSTANTS.INLINE_BREADCRUMB_CLASS_NAME}, .og-fdb-doc-nav`);
         [].forEach.call(fakeBreadcrumb, (e: HTMLElement) => {
             e.classList.remove("og-hide-breadcrumb");
         });

@@ -137,6 +137,8 @@ export class InlineBreadcrumbController {
     wrapper: HTMLElement | null = null;
     host: HTMLElement | null = null;
     nativeBar: HTMLElement | null = null;
+    /** 同行模式：固定于 host 右侧按钮组的相邻文档导航容器 */
+    adjacentNav: HTMLElement | null = null;
     parts: any = null;
     abortController: AbortController;
     actions: Map<string, ControllerAction>;
@@ -175,7 +177,8 @@ export class InlineBreadcrumbController {
         parts.host.querySelectorAll<HTMLElement>(
             `:scope > .${CONSTANTS.INLINE_BREADCRUMB_CLASS_NAME},` +
             `:scope > .${CONSTANTS.CONTAINER_CLASS_NAME},` +
-            ":scope > .og-breadcrumb-oneline-divider"
+            ":scope > .og-breadcrumb-oneline-divider," +
+            ":scope > .og-fdb-doc-nav"
         ).forEach((element: HTMLElement) => element.remove());
 
         const isCardPage = this.protyle.element.classList.contains("card__block");
@@ -235,6 +238,50 @@ export class InlineBreadcrumbController {
     }
 
     /**
+     * 同行模式：相邻文档导航固定在 host 右侧按钮组（space 之后），
+     * 不随 bar 内容带滚动，也不受思源重写 bar innerHTML 的影响。
+     */
+    bindNavEvents(nav: HTMLElement) {
+        const signal = this.abortController.signal;
+        nav.addEventListener("click", this.handleClick, { signal });
+        nav.addEventListener("auxclick", this.handleAuxClick, { signal });
+        nav.addEventListener("contextmenu", this.handleContextMenu, { signal });
+    }
+
+    /**
+     * 同步相邻文档导航：
+     * - 同行模式：重建 host 右侧按钮组中的 nav（action registry 需随内容重建）；
+     * - 两行模式：保持原行为，nav 跟随 root 末尾渲染。
+     */
+    syncAdjacentNav() {
+        const adjacent = this.lastModel?.adjacent ?? null;
+        if (this.nativeBar) {
+            // 同行模式：固定于 host 右侧按钮组
+            let nav = this.adjacentNav;
+            if (!adjacent) {
+                nav?.remove();
+                this.adjacentNav = null;
+                return;
+            }
+            if (!nav || !nav.isConnected) {
+                nav = document.createElement("span");
+                nav.className = "og-fdb-doc-nav";
+                this.host?.insertBefore(nav, this.parts.space?.nextSibling ?? null);
+                this.adjacentNav = nav;
+                this.bindNavEvents(nav);
+            }
+            nav.textContent = "";
+            nav.appendChild(createAdjacentDocNav(adjacent, this));
+        } else if (this.root) {
+            // 两行模式：跟随 root 末尾渲染
+            this.root.querySelector(":scope > .og-fdb-doc-nav")?.remove();
+            if (adjacent) {
+                this.root.appendChild(createAdjacentDocNav(adjacent, this));
+            }
+        }
+    }
+
+    /**
      * 思源每次异步渲染块面包屑都会执行 `this.element.innerHTML = html`，
      * 这会清除插件插入 bar 内的内容容器。
      * MutationObserver 只用于内容恢复，不参与布局计算。
@@ -268,15 +315,14 @@ export class InlineBreadcrumbController {
         this.root = createInlineRoot();
         if (this.lastModel) {
             this.root.appendChild(renderBreadcrumbFragment(this.lastModel.entries, this));
-            if (this.lastModel.adjacent) {
-                this.root.appendChild(createAdjacentDocNav(this.lastModel.adjacent, this));
-            }
             // 同行模式：内容带末尾追加与原生内容带之间的装饰分隔箭头
             if (this.nativeBar && this.lastModel.entries.length > 0) {
                 this.root.appendChild(createBreadcrumbDivider());
             }
         }
         this.nativeBar.insertBefore(this.root, this.nativeBar.firstElementChild);
+        // 相邻导航不参与 bar 重写，但需重建以同步 action registry
+        this.syncAdjacentNav();
 
         // 同行模式：空间不足时恢复思源原生省略机制（先压缩再计算宽度补偿）
         if (this.nativeBar) {
@@ -304,11 +350,16 @@ export class InlineBreadcrumbController {
 
         const target = event.target.closest("[data-og-fdb-action-key]");
 
-        if (!target || !this.root?.contains(target)) {
+        if (!target) {
             return null;
         }
 
-        return target;
+        // 同行模式：相邻导航在 host 右侧按钮组中，不在 root 内
+        if (this.root?.contains(target) || this.adjacentNav?.contains(target)) {
+            return target;
+        }
+
+        return null;
     }
 
     handleClick(event: Event) {
@@ -520,14 +571,13 @@ export class InlineBreadcrumbController {
 
         this.root.appendChild(renderBreadcrumbFragment(model.entries, this));
 
-        if (model.adjacent) {
-            this.root.appendChild(createAdjacentDocNav(model.adjacent, this));
-        }
-
         // 同行模式：内容带末尾追加与原生内容带之间的装饰分隔箭头
         if (this.nativeBar && model.entries.length > 0) {
             this.root.appendChild(createBreadcrumbDivider());
         }
+
+        // 相邻文档导航：同行模式固定在右侧按钮组，两行模式跟随 root 末尾
+        this.syncAdjacentNav();
 
         // 同行模式：空间不足时恢复思源原生省略机制
         if (this.nativeBar) {
@@ -547,6 +597,7 @@ export class InlineBreadcrumbController {
 
         this.root?.remove();
         this.wrapper?.remove();
+        this.adjacentNav?.remove();
 
         if (this.host?.isConnected) {
             this.host.classList.remove(CONSTANTS.HOST_STATE_CLASS_NAME);
@@ -556,6 +607,7 @@ export class InlineBreadcrumbController {
         this.wrapper = null;
         this.host = null;
         this.nativeBar = null;
+        this.adjacentNav = null;
         this.parts = null;
     }
 }

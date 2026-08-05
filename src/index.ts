@@ -93,7 +93,7 @@ export class FakeDocBreadcrumb extends Plugin {
     onunload() {
         destroyAllControllers();
         // 清理所有模式下的插件节点与状态类，保证 DOM 完全恢复
-        [].forEach.call(document.querySelectorAll(`.${CONSTANTS.CONTAINER_CLASS_NAME}, .${CONSTANTS.INLINE_BREADCRUMB_CLASS_NAME}, .og-breadcrumb-oneline-divider`), (elem: HTMLElement) => {
+        [].forEach.call(document.querySelectorAll(`.${CONSTANTS.CONTAINER_CLASS_NAME}, .${CONSTANTS.INLINE_BREADCRUMB_CLASS_NAME}, .og-breadcrumb-oneline-divider, .og-fdb-doc-nav`), (elem: HTMLElement) => {
             elem.remove();
         });
         [].forEach.call(document.querySelectorAll(`.${CONSTANTS.HOST_STATE_CLASS_NAME}`), (elem: HTMLElement) => {
