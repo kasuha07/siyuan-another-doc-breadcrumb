@@ -13,8 +13,6 @@
     "setting_foldedFrontShow_desp": "",
     "setting_foldedEndShow_name": "Keep the last N documents",
     "setting_foldedEndShow_desp": "",
-    "setting_allowFloatWindow_name": "Allow float window",
-    "setting_allowFloatWindow_desp": "When enabled, an float window will appear on mouseover. The floating window trigger condition follows the editor setting. If you just change it, you need to reopen the existing document tab.",
     "setting_usePluginArrow_name": "Override theme's breadcrumb separator \">\" style",
     "setting_usePluginArrow_desp": "For some themes that display the breadcrumb separator \">\" as \"/\", clicking the separator does not display the subdocument menu. Enabling this will resolve this issue.",
     "setting_mainRetry_name": "Retry times",

@@ -39,7 +39,6 @@ export const g_setting_default = {
     "foldedFrontShow": 2,
     "foldedEndShow": 3,
     "oneLineBreadcrumb": true,
-    "allowFloatWindow": false, // 触发浮窗
     "usePluginArrow": true, // 使用挂件>箭头
     "icon": 1,
     "menuKeepCurrentVisible": true,

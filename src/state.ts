@@ -33,7 +33,6 @@ export const state: StateShape = {
         "foldedFrontShow": null,
         "foldedEndShow": null,
         "oneLineBreadcrumb": null,
-        "allowFloatWindow": null,
         "usePluginArrow": null,
         "icon": null,
         "menuKeepCurrentVisible": null,
