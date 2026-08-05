@@ -27,6 +27,8 @@ export const CONSTANTS = {
     ADJ_NONE: "0",
     ADJ_SAME_PARENT: "1",
     ADJ_SAME_LEVEL: "2",
+    ADJ_SHOW_TEXT: "0",
+    ADJ_ARROW_ONLY: "1",
 }
 
 export const g_setting_default = {
@@ -50,6 +52,7 @@ export const g_setting_default = {
     "swapClickFunction": false,
     "showRoot": false,
     "showAdjacentDocButton": CONSTANTS.ADJ_SAME_LEVEL,
+    "adjacentNavStyle": CONSTANTS.ADJ_SHOW_TEXT,
     "autoFixFocusError": false,
     "createDocBtnInMenu": false,
 };

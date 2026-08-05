@@ -8,6 +8,64 @@ import { getNodebookList, listDocsByPath, openRefLinkByAPI } from "./api";
 import { trimListDocsByPathAPIReturnedDocName } from "./utils";
 import type { ActionRegistrar, AdjacentResult, PathObject } from "./types";
 
+/**
+ * 仅箭头模式下的悬浮提示：复用思源全局 `.tooltip` 类
+ * （fixed 定位、--b3-tooltips-* 主题变量、zoomIn 动画，主题可自定义）。
+ * 不用 `.b3-tooltips` 伪元素方案：两行模式下 nav 位于 overflow-y: hidden 的
+ * 滚动容器内，绝对定位伪元素会被裁剪。
+ * 弹出节奏：JS 延迟 100ms 后挂载，并覆盖 CSS 的 300ms 动画延迟立即播放 zoomIn，
+ * 总延迟约 250ms，快于思源原生 showTooltip（约 600ms），减少等待感。
+ */
+let adjacentTooltip: HTMLDivElement | null = null;
+let adjacentTooltipTimer: any = null;
+
+function getAdjacentTooltip(): HTMLDivElement {
+    if (!adjacentTooltip) {
+        adjacentTooltip = document.createElement("div");
+        adjacentTooltip.className = "tooltip";
+        adjacentTooltip.style.pointerEvents = "none";
+        adjacentTooltip.style.display = "none";
+        document.body.appendChild(adjacentTooltip);
+    }
+    return adjacentTooltip;
+}
+
+export function removeAdjacentTooltip() {
+    if (adjacentTooltipTimer) {
+        clearTimeout(adjacentTooltipTimer);
+        adjacentTooltipTimer = null;
+    }
+    adjacentTooltip?.remove();
+    adjacentTooltip = null;
+}
+
+function bindAdjacentTooltip(button: HTMLButtonElement, text: string) {
+    button.addEventListener("mouseenter", () => {
+        if (adjacentTooltipTimer) {
+            clearTimeout(adjacentTooltipTimer);
+        }
+        adjacentTooltipTimer = setTimeout(() => {
+            adjacentTooltipTimer = null;
+            const tip = getAdjacentTooltip();
+            tip.textContent = text;
+            const rect = button.getBoundingClientRect();
+            tip.style.left = `${rect.left}px`;
+            tip.style.top = `${rect.bottom + 8}px`;
+            tip.style.animationDelay = "0ms";
+            tip.style.display = "block";
+        }, 100);
+    });
+    button.addEventListener("mouseleave", () => {
+        if (adjacentTooltipTimer) {
+            clearTimeout(adjacentTooltipTimer);
+            adjacentTooltipTimer = null;
+        }
+        if (adjacentTooltip) {
+            adjacentTooltip.style.display = "none";
+        }
+    });
+}
+
 export function createAdjacentDocNav(adjacent: AdjacentResult, controller: ActionRegistrar) {
     const navElement = document.createElement("span");
     navElement.className = "og-fdb-doc-nav";
@@ -23,6 +81,8 @@ export function createAdjacentDocButton(direction: string, doc: any, isSameLevel
     button.type = "button";
     button.className = "og-fdb-doc-nav-button";
     button.setAttribute("data-og-adjacent-direction", direction);
+    // 仅箭头模式：不渲染文档名称，悬浮时显示思源原生 tooltip
+    const arrowOnly = state.g_setting.adjacentNavStyle === CONSTANTS.ADJ_ARROW_ONLY;
     let buttonText = label;
 
     if (doc?.id) {
@@ -35,29 +95,46 @@ export function createAdjacentDocButton(direction: string, doc: any, isSameLevel
         });
         button.setAttribute("data-og-fdb-action-key", actionKey);
         button.setAttribute("data-doc-id", doc.id);
-        button.setAttribute("title", `${label}: ${docName}`);
+        const tipText = `${label}: ${docName}`;
+        if (arrowOnly) {
+            bindAdjacentTooltip(button, tipText);
+        } else {
+            button.setAttribute("title", tipText);
+        }
     } else {
         button.disabled = true;
-        button.setAttribute("title", label);
+        if (arrowOnly) {
+            bindAdjacentTooltip(button, label);
+        } else {
+            button.setAttribute("title", label);
+        }
     }
 
     const svgNS = "http://www.w3.org/2000/svg";
     const svg = document.createElementNS(svgNS, "svg");
-    svg.setAttribute("title", button.getAttribute("title") as string);
+    // 仅箭头模式不使用浏览器原生 title（悬浮提示由思源 tooltip 承担）
+    const buttonTitle = button.getAttribute("title");
+    if (buttonTitle) {
+        svg.setAttribute("title", buttonTitle);
+    }
     const use = document.createElementNS(svgNS, "use");
     use.setAttributeNS("http://www.w3.org/1999/xlink", "xlink:href", isPrevious ? "#iconLeft" : "#iconRight");
     svg.appendChild(use);
 
-    const textSpan = document.createElement("span");
-    textSpan.className = "og-fdb-doc-nav-button-text";
-    textSpan.textContent = buttonText;
-
-    if (isPrevious) {
+    if (arrowOnly) {
         button.appendChild(svg);
-        button.appendChild(textSpan);
     } else {
-        button.appendChild(textSpan);
-        button.appendChild(svg);
+        const textSpan = document.createElement("span");
+        textSpan.className = "og-fdb-doc-nav-button-text";
+        textSpan.textContent = buttonText;
+
+        if (isPrevious) {
+            button.appendChild(svg);
+            button.appendChild(textSpan);
+        } else {
+            button.appendChild(textSpan);
+            button.appendChild(svg);
+        }
     }
     return button;
 }

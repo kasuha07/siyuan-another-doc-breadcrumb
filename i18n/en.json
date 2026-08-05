@@ -45,6 +45,10 @@
     "setting_showAdjacentDocButton_option_0": "Do not show",
     "setting_showAdjacentDocButton_option_1": "Show only for same parent documents",
     "setting_showAdjacentDocButton_option_2": "Show for same level documents",
+    "setting_adjacentNavStyle_name": "Style of the previous/next document buttons",
+    "setting_adjacentNavStyle_desp": "Controls how the previous/next document buttons are displayed; when arrows only, hovering over a button shows the document name",
+    "setting_adjacentNavStyle_option_0": "Arrow + document name",
+    "setting_adjacentNavStyle_option_1": "Arrow only",
     "setting_createDocBtnInMenu_name": "🧪Show create document button in document menu",
     "setting_createDocBtnInMenu_desp": "Show a create document button in the subdocument menu of the document breadcrumb; clicking it will create a new document at the corresponding level",
 

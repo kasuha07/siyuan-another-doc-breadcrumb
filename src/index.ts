@@ -27,6 +27,7 @@ import { debugPush, errorPush, warnPush } from "./logger";
 import { generateSettingPanel, loadUISettings, SettingProperty } from "./settings";
 import { removeStyle, setStyle } from "./style";
 import { destroyAllControllers } from "./controller";
+import { removeAdjacentTooltip } from "./adjacent";
 import { eventBusHandler, handleDestroyProtyle, initRetry, mainEventBusHander, refreshAllShowingProtyles, removeMouseKeyboardListener, setMouseKeyboardListener } from "./events";
 import { isMobile, isSomePluginExist } from "./utils";
 
@@ -92,6 +93,7 @@ export class FakeDocBreadcrumb extends Plugin {
 
     onunload() {
         destroyAllControllers();
+        removeAdjacentTooltip();
         // 清理所有模式下的插件节点与状态类，保证 DOM 完全恢复
         [].forEach.call(document.querySelectorAll(`.${CONSTANTS.CONTAINER_CLASS_NAME}, .${CONSTANTS.INLINE_BREADCRUMB_CLASS_NAME}, .og-breadcrumb-oneline-divider, .og-fdb-doc-nav`), (elem: HTMLElement) => {
             elem.remove();
@@ -172,6 +174,10 @@ export class FakeDocBreadcrumb extends Plugin {
                 { value: CONSTANTS.ADJ_NONE },
                 { value: CONSTANTS.ADJ_SAME_PARENT },
                 { value: CONSTANTS.ADJ_SAME_LEVEL },
+            ]),
+            new SettingProperty("adjacentNavStyle", "SELECT", [
+                { value: CONSTANTS.ADJ_SHOW_TEXT },
+                { value: CONSTANTS.ADJ_ARROW_ONLY },
             ]),
             new SettingProperty("createDocBtnInMenu", "SWITCH", null),
         ]));
