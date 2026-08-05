@@ -103,22 +103,16 @@ export function createBreadcrumbIcon(iconString: any, hasChild: boolean) {
     const textClassName = "og-fdb-bread-emojitext";
     const picClassName = "og-fdb-bread-emojipic";
 
-    // 无emoji的处理
+    // 无自定义图标时显示默认图标，避免空白占位（仅自定义 / 显示全部均适用）
     if (iconString == undefined || iconString == null || iconString == "") {
-        if (state.g_setting.icon == CONSTANTS.ICON_ALL) {
-            const localImages = window.siyuan.storage?.["local-images"];
-            const localIcon = hasChild ? localImages?.folder : localImages?.file;
-            if (localIcon) {
-                return createBreadcrumbIcon(localIcon, hasChild);
-            }
-            const span = document.createElement("span");
-            span.className = textClassName;
-            span.textContent = hasChild ? "📑" : "📄";
-            return span;
+        const localImages = window.siyuan.storage?.["local-images"];
+        const localIcon = hasChild ? localImages?.folder : localImages?.file;
+        if (localIcon) {
+            return createBreadcrumbIcon(localIcon, hasChild);
         }
-        // ICON_CUSTOM_ONLY：无自定义图标时输出空白占位
         const span = document.createElement("span");
         span.className = textClassName;
+        span.textContent = hasChild ? "📑" : "📄";
         return span;
     }
 

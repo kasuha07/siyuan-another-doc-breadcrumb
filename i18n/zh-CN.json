@@ -45,7 +45,7 @@
     "setting_icon_name": "文档图标",
     "setting_icon_desp": "控制子文档菜单、面包屑路径中文档图标显示与否",
     "setting_icon_option_0": "不显示",
-    "setting_icon_option_1": "仅自定义",
+    "setting_icon_option_1": "自定义+默认",
     "setting_icon_option_2": "显示全部",
     "setting_menuKeepCurrentVisible_name": "子文档菜单：展开菜单时滚动到当前路径",
     "setting_menuKeepCurrentVisible_desp": "当开启时，下层文档菜单会自动滚动，以保证当前所在文档的路径可以显示；文档最大数量设置较小导致未列出时除外；",

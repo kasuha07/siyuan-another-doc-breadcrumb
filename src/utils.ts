@@ -23,13 +23,12 @@ export function isSomePluginExist(pluginList: any, checkPluginName: string[]) {
  * @param {str} textClassName 文本的span class名称
  * @param {str} picClassName 图片img class名称
  * @param {boolean} wrapText 将文本使用text包裹
- * @param {boolean} wrapBlank 即使按照设置并没有图标，也使用span包裹图标
  * @returns 
  */
-export function getEmojiHtmlStr(iconString: any, hasChild: boolean, textClassName = "og-fdb-menu-emojitext", picClassName = "og-fdb-menu-emojipic", wrapText = true, wrapBlank = true) {
+export function getEmojiHtmlStr(iconString: any, hasChild: boolean, textClassName = "og-fdb-menu-emojitext", picClassName = "og-fdb-menu-emojipic", wrapText = true) {
     if (state.g_setting.icon == CONSTANTS.ICON_NONE) return ``;
-    // 无emoji的处理
-    if ((iconString == undefined || iconString == null || iconString == "") && state.g_setting.icon == CONSTANTS.ICON_ALL) {
+    // 无自定义图标时显示默认图标，避免空白占位（仅自定义 / 显示全部均适用）
+    if (iconString == undefined || iconString == null || iconString == "") {
         if (window.siyuan.storage["local-images"]) {
             if (hasChild) {
                 return getEmojiHtmlStr(window.siyuan.storage["local-images"].folder, hasChild, textClassName, picClassName, wrapText);
@@ -49,13 +48,6 @@ export function getEmojiHtmlStr(iconString: any, hasChild: boolean, textClassNam
             } else {
                 return "📄";
             }
-        }
-    }
-    if ((iconString == undefined || iconString == null || iconString == "") && state.g_setting.icon == CONSTANTS.ICON_CUSTOM_ONLY) {
-        if (wrapBlank) {
-            return `<span class="${textClassName}"></span>`;
-        } else {
-            return "";
         }
     }
     let result: any = iconString;
