@@ -60,10 +60,9 @@ export function setStyle() {
     /* 滚动由原生 bar 统一承担 */
     overflow: visible;
 
-    /* 使用边框代替单独的 divider DOM */
-    border-inline-end: 1px solid var(--b3-theme-on-surface-light);
+    /* 与原生内容带的分隔由 JS 渲染为内容带末尾的装饰箭头
+     * .og-fdb-inline__divider，不再使用边框竖线 */
     margin-inline-end: 6px;
-    padding-inline-end: 6px;
 }
 
 /* 内容带内所有直接子项不得继续压缩（插件容器、原生路径项） */
@@ -156,6 +155,25 @@ export function setStyle() {
     padding: 0 2px;
 }
 .og-fdb-inline__arrow > svg {
+    height: 14px;
+    width: 14px;
+}
+
+/* 内容带与原生内容带之间的装饰分隔箭头（同行模式，无交互） */
+.og-fdb-inline__divider {
+    align-items: center;
+    align-self: center;
+    color: var(--b3-theme-on-surface-light);
+    display: inline-flex;
+    flex: 0 0 auto;
+    height: 24px;
+    justify-content: center;
+    margin: 3px 0;
+    padding: 0 2px;
+    pointer-events: none;
+    user-select: none;
+}
+.og-fdb-inline__divider > svg {
     height: 14px;
     width: 14px;
 }

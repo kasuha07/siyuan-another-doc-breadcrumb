@@ -13,7 +13,7 @@ import { state } from "./state";
 import { isNotebookDocEnabled, isValidStr } from "./utils";
 import { openRefLinkAgent } from "./api";
 import { buildDocumentBreadcrumbModel } from "./model";
-import { renderBreadcrumbFragment } from "./render";
+import { renderBreadcrumbFragment, createBreadcrumbDivider } from "./render";
 import { createAdjacentDocNav, clickAdjacentDocButton } from "./adjacent";
 import { openHideMenu, openRelativeMenu } from "./menus";
 import { addBlockBdMenuListener } from "./breadcrumbMenu";
@@ -231,6 +231,10 @@ export class InlineBreadcrumbController {
             this.root.appendChild(renderBreadcrumbFragment(this.lastModel.entries, this));
             if (this.lastModel.adjacent) {
                 this.root.appendChild(createAdjacentDocNav(this.lastModel.adjacent, this));
+            }
+            // 同行模式：内容带末尾追加与原生内容带之间的装饰分隔箭头
+            if (this.nativeBar && this.lastModel.entries.length > 0) {
+                this.root.appendChild(createBreadcrumbDivider());
             }
         }
         this.nativeBar.insertBefore(this.root, this.nativeBar.firstElementChild);
@@ -474,6 +478,11 @@ export class InlineBreadcrumbController {
 
         if (model.adjacent) {
             this.root.appendChild(createAdjacentDocNav(model.adjacent, this));
+        }
+
+        // 同行模式：内容带末尾追加与原生内容带之间的装饰分隔箭头
+        if (this.nativeBar && model.entries.length > 0) {
+            this.root.appendChild(createBreadcrumbDivider());
         }
 
         // 首次渲染或文档切换：滚到最右端；同文档刷新：保留原位置
