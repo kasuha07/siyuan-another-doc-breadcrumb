@@ -4,7 +4,7 @@
   "description": "[中文](README_zh_CN.md) | **English**",
   "main": "index.js",
   "scripts": {
-    "build": "tsc && node scripts/copy-assets.js",
+    "build": "node scripts/clean.js && esbuild src/index.ts --bundle --platform=node --format=cjs --target=es2017 --external:siyuan --outfile=dist/index.js && node scripts/copy-assets.js",
     "verify": "node scripts/verify.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
@@ -22,6 +22,7 @@
   "homepage": "https://github.com/OpaqueGlass/syplugin-fakeDocBreadcrumb#readme",
   "devDependencies": {
     "@types/node": "^26.1.2",
+    "esbuild": "^0.28.1",
     "siyuan": "^1.2.3",
     "typescript": "^7.0.2"
   }

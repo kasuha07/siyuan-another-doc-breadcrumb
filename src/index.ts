@@ -200,6 +200,4 @@ export class FakeDocBreadcrumb extends Plugin {
     }
 }
 
-module.exports = {
-    default: FakeDocBreadcrumb,
-};
+export default FakeDocBreadcrumb;

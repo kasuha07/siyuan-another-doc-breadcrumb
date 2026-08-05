@@ -40,27 +40,31 @@ Module._load = function (request, parent, isMain) {
 global.window = { top: {}, document: { querySelectorAll: () => [], getElementById: () => null } };
 global.document = { getElementsByTagName: () => [], createElement: () => ({}) };
 
+// 检查 dist 为单文件 bundle：思源内核只读取 index.js 一个文件（见 kernel/model/plugin.go loadCode），
+// 前端 window.eval 执行且 requireFunc 仅支持 'siyuan'，因此不得残留其他模块文件
+const fs = require('fs');
+const distDir = path.join(__dirname, '..', 'dist');
+const jsFiles = fs.readdirSync(distDir).filter(f => f.endsWith('.js'));
+if (jsFiles.length !== 1 || jsFiles[0] !== 'index.js') {
+    console.error('FAIL: dist 应只包含 index.js 单文件 bundle, 实际 =', jsFiles);
+    process.exit(1);
+}
+console.log('OK: dist 单文件产物 = index.js');
+
+// 验证 bundle 内没有残留相对路径 require（思源环境无法解析）
+const bundle = fs.readFileSync(path.join(distDir, 'index.js'), 'utf8');
+const relativeRequires = bundle.match(/\.?require\(['"]\.\//g) || [];
+if (relativeRequires.length > 0) {
+    console.error('FAIL: bundle 内存在相对路径 require:', relativeRequires);
+    process.exit(1);
+}
+console.log('OK: bundle 内无相对路径 require');
+
+// 验证入口默认导出
 const root = require('../index.js');
 const entry = root.default || root;
-
 if (typeof entry !== 'function' && typeof entry !== 'object') {
     console.error('FAIL: 入口导出不是插件类');
     process.exit(1);
 }
-console.log('OK: 入口加载成功, export keys =', Object.keys(root));
-console.log('OK: default =', entry.name || '(class)');
-
-// 检查 dist 内所有模块可加载
-const fs = require('fs');
-const distDir = path.join(__dirname, '..', 'dist');
-const files = fs.readdirSync(distDir).filter(f => f.endsWith('.js'));
-for (const f of files) {
-    require(path.join(distDir, f));
-}
-console.log('OK: dist 全部模块可加载, 共', files.length, '个文件');
-
-// 验证 state 单例共享：events 里赋值的 state 与 index 读取的一致
-const state = require('../dist/state.js').state;
-const utils = require('../dist/utils.js');
-console.log('OK: state.g_setting 初始键数 =', Object.keys(state.g_setting).length);
-console.log('OK: utils.isValidStr("") =', utils.isValidStr(''), ', isValidStr("a") =', utils.isValidStr('a'));
+console.log('OK: 入口导出 =', entry.name || '(class)');
