@@ -111,10 +111,13 @@ export async function createAndOpenEmptyDocAt(box: string, path: string) {
         if (response && response.id) {
             openRefLinkByAPI({
                 paramDocId: response.id,
+                // 与思源官方新建文档打开行为一致：获取上下文 + 只读模式下解锁编辑
+                action: [Constants.CB_GET_CONTEXT, Constants.CB_GET_OPENNEW],
             });
         }
     }).catch((err) => {
         errorPush(err);
+        showMessage(`${state.language["createDocFailed"] ?? "创建文档失败"}：${err?.message ?? err}`);
     });
 }
 
@@ -128,11 +131,15 @@ export async function createDoc(notebookId: string, path: string, title: string,
         listDocTree: listDocTree
     }
     let response = await request(url, data);
+    if (response == null) {
+        // fetch 网络失败时 request 返回 null，这里抛出可读错误，避免上层静默
+        throw new Error("createDoc request failed");
+    }
     if (response.code == 0) {
         return response.data;
-    } else {
-        return null;
     }
+    // 后端返回错误（如层级深度超限、父文档缺失等），抛出以显示给用户
+    throw new Error(response.msg || "createDoc failed");
 }
 
 export async function getDocOutline(docId: string) {
@@ -236,9 +243,10 @@ let lastClickTime_openRefLinkByAPI = 0;
  * @param removeCurrentTab 是否移除当前Tab
  * @param autoRemoveJudgeMiliseconds 自动判断是否移除当前Tab的时间间隔（0则 不自动判断）
  * @param preventDefault {boolean} 控制是否禁止默认行为以及冒泡操作；如果在菜单中，请在调用前禁止冒泡和默认行为；另外，也可充当是否在当前聚焦窗口打开的控制（false，则在面包屑所在文档打开）
+ * @param action 打开文档时携带的 ProtyleAction 列表，默认 [CB_GET_SCROLL]；新建文档应传 [CB_GET_CONTEXT, CB_GET_OPENNEW] 与官方行为一致
  * @returns 
  */
-export function openRefLinkByAPI({ mouseEvent, paramDocId = "", keyParam = {}, openInFocus = undefined, removeCurrentTab = undefined, autoRemoveJudgeMiliseconds = 0, preventDefault = false }: any) {
+export function openRefLinkByAPI({ mouseEvent, paramDocId = "", keyParam = {}, openInFocus = undefined, removeCurrentTab = undefined, autoRemoveJudgeMiliseconds = 0, preventDefault = false, action = undefined }: any) {
     let docId: string | undefined;
     if (isValidStr(paramDocId)) {
         docId = paramDocId;
@@ -294,7 +302,7 @@ export function openRefLinkByAPI({ mouseEvent, paramDocId = "", keyParam = {}, o
         doc: {
             id: docId,
             zoomIn: openInFocus,
-            action: [Constants.CB_GET_SCROLL],
+            action: action ?? [Constants.CB_GET_SCROLL],
         },
         position: positionKey,
         keepCursor: isEventCtrlKey(keyParam) ? true : undefined,

@@ -32,7 +32,7 @@ export const CONSTANTS = {
 }
 
 export const g_setting_default = {
-    "@version": 20260729,
+    "@version": 20260805,
     "nameMaxLength": 15,
     "docMaxNum": 128,
     "showNotebook": true,
@@ -54,7 +54,7 @@ export const g_setting_default = {
     "showAdjacentDocButton": CONSTANTS.ADJ_SAME_LEVEL,
     "adjacentNavStyle": CONSTANTS.ADJ_SHOW_TEXT,
     "autoFixFocusError": false,
-    "createDocBtnInMenu": false,
+    "createDocBtnInMenu": true,
 };
 
 /**
@@ -67,6 +67,7 @@ export let zh_CN: { [key: string]: string } = {
     "setting_docMaxNum_desp": "当子文档或同级文档超过该值时，后续文档将不再显示。设置为0则不限制。",
     "setting_showAdjacentDocButton_name": "显示上一篇/下一篇按钮",
     "setting_showAdjacentDocButton_desp": "在文档面包屑右侧显示上一篇文档和下一篇文档按钮；按文件树顺序在同一层级深度的文档之间跳转。",
+    "createDocFailed": "创建文档失败",
     "previous_doc": "上一篇文档",
     "next_doc": "下一篇文档",
     "error_initFailed": "文档面包屑插件初始化失败，如果可以，请向开发者反馈此问题",

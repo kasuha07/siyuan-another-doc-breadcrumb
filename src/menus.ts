@@ -5,7 +5,17 @@ import { Menu } from "siyuan";
 import { CONSTANTS } from "./constants";
 import { state } from "./state";
 import { createAndOpenEmptyDocAt, getChildDocuments, openRefLinkByAPI } from "./api";
+import { errorPush } from "./logger";
 import { decodeHtmlEntities, getEmojiHtmlStr, isNotebookDocEnabled, trimListDocsByPathAPIReturnedDocName } from "./utils";
+
+/**
+ * 判断在 path（父文档物理路径，.sy 结尾）下新建子文档是否超过 kernel 深度限制：
+ * kernel 在创建时校验 strings.Count(newPath, "/") > 7（即父路径斜杠数 >= 7）时报错；
+ * 开启“允许创建更深层级文档”设置后可突破限制。
+ */
+export function isCreateDocDepthLimited(path: string) {
+    return path.split("/").length - 1 >= 7 && !window.siyuan.config?.fileTree?.allowCreateDeeper;
+}
 
 /**
  * 非空断言（!）说明：
@@ -102,24 +112,41 @@ export async function openRelativeMenu({ protyle, anchorElement, parentId, nextI
     if (!checkAndCloseLastMenu(id)) {
         return;
     }
+    // 占位标记：getChildDocuments 为异步，期间若用户再次触发其他菜单，
+    // 后打开的调用会覆盖此占位；await 结束后凭 id 比对决定是否放弃本次打开，
+    // 避免多个 openRelativeMenu 并发操作共享的 #commonMenu 相互清空。
+    state.g_relativeMenu = { "menu": null, "id": id };
 
     let siblings: any[] = [];
 
-    if (type !== "ROOT") {
-        let sqlResult = [{
-            path: path,
-            box: box
-        }];
-        siblings = await getChildDocuments(id, sqlResult);
-    } else {
-        siblings = window.siyuan.notebooks!.filter(item => item.closed == false);
+    try {
+        if (type !== "ROOT") {
+            let sqlResult = [{
+                path: path,
+                box: box
+            }];
+            siblings = await getChildDocuments(id, sqlResult);
+        } else {
+            siblings = window.siyuan.notebooks!.filter(item => item.closed == false);
+        }
+    } catch (err) {
+        errorPush(err);
+        state.g_relativeMenu = null;
+        return;
     }
-    if (siblings.length <= 0) return;
+    // 加载期间已有更新的菜单被打开，放弃本次打开
+    if (!state.g_relativeMenu || state.g_relativeMenu["id"] !== id) {
+        return;
+    }
+    if (siblings.length <= 0) {
+        state.g_relativeMenu = null;
+        return;
+    }
 
     const tempMenu = new Menu("og-fdb-relative-menu");
     // 创建新文档
     // 只读模式这里也是显示创建按钮的
-    if (state.g_setting.createDocBtnInMenu && type !== "ROOT") {
+    if (state.g_setting.createDocBtnInMenu && type !== "ROOT" && !isCreateDocDepthLimited(path)) {
         let tempMenuItemObj: any = {
             icon: `iconAdd`,
             label: `<span class="${CONSTANTS.MENU_ITEM_CLASS_NAME}">${window.siyuan.languages!.newFile}</span>`,
@@ -127,6 +154,9 @@ export async function openRelativeMenu({ protyle, anchorElement, parentId, nextI
                 event.preventDefault();
                 event.stopImmediatePropagation();
                 event.stopPropagation();
+                // 关闭菜单并清理状态，避免创建完成后菜单残留或状态与 DOM 脱节
+                state.g_relativeMenu["menu"]?.close();
+                state.g_relativeMenu = null;
                 createAndOpenEmptyDocAt(box, path);
             }
         };
@@ -260,34 +290,37 @@ export function addLazyLoadEventListeners(menuElement: Element, maxDepth: number
             }
 
             // 创建子文档菜单项
-            // Menu Item
-            const menuItemEl = document.createElement('button');
-            menuItemEl.className = 'b3-menu__item';
-            // icon
-            const iconAddEl = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-            iconAddEl.classList.add('b3-menu__icon');
-            iconAddEl.innerHTML = `<use xlink:href="#iconAdd"></use>`;
-            menuItemEl.appendChild(iconAddEl);
+            if (!isCreateDocDepthLimited(path)) {
+                // Menu Item
+                const menuItemEl = document.createElement('button');
+                menuItemEl.className = 'b3-menu__item';
+                // icon
+                const iconAddEl = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+                iconAddEl.classList.add('b3-menu__icon');
+                iconAddEl.innerHTML = `<use xlink:href="#iconAdd"></use>`;
+                menuItemEl.appendChild(iconAddEl);
 
-            // label
-            const labelEl = document.createElement('span');
-            labelEl.className = 'b3-menu__label';
+                // label
+                const labelEl = document.createElement('span');
+                labelEl.className = 'b3-menu__label';
 
-            // title
-            const docTitleEl = document.createElement('span');
-            docTitleEl.className = `${CONSTANTS.MENU_ITEM_CLASS_NAME}`;
-            docTitleEl.textContent = window.siyuan.languages!.newFile;
-            labelEl.appendChild(docTitleEl);
-            menuItemEl.appendChild(labelEl);
-            submenuContainer.appendChild(menuItemEl);
-            menuItemEl.addEventListener('click', (event: any) => {
-                event.preventDefault();
-                event.stopImmediatePropagation();
-                event.stopPropagation();
-                createAndOpenEmptyDocAt(box, path);
-                state.g_relativeMenu["menu"]?.close();
-                state.g_relativeMenu = null;
-            });
+                // title
+                const docTitleEl = document.createElement('span');
+                docTitleEl.className = `${CONSTANTS.MENU_ITEM_CLASS_NAME}`;
+                docTitleEl.textContent = window.siyuan.languages!.newFile;
+                labelEl.appendChild(docTitleEl);
+                menuItemEl.appendChild(labelEl);
+                submenuContainer.appendChild(menuItemEl);
+                menuItemEl.addEventListener('click', (event: any) => {
+                    event.preventDefault();
+                    event.stopImmediatePropagation();
+                    event.stopPropagation();
+                    // 先关闭菜单并清理状态，再异步创建
+                    state.g_relativeMenu["menu"]?.close();
+                    state.g_relativeMenu = null;
+                    createAndOpenEmptyDocAt(box, path);
+                });
+            }
 
             // 子文档菜单
             for (const childDoc of childDocuments) {

@@ -49,8 +49,9 @@
     "setting_adjacentNavStyle_desp": "Controls how the previous/next document buttons are displayed; when arrows only, hovering over a button shows the document name",
     "setting_adjacentNavStyle_option_0": "Arrow + document name",
     "setting_adjacentNavStyle_option_1": "Arrow only",
-    "setting_createDocBtnInMenu_name": "🧪Show create document button in document menu",
+    "setting_createDocBtnInMenu_name": "Show create document button in document menu",
     "setting_createDocBtnInMenu_desp": "Show a create document button in the subdocument menu of the document breadcrumb; clicking it will create a new document at the corresponding level",
+    "createDocFailed": "Failed to create document",
 
     "conflict_plugin_oneline_breadcrumb": "Detected conflicting plugins (occupying the line below breadcrumbs). The fakeDocBreadcrumb plugin suggest enable the \"🧪 Display the document breadcrumb on the same line as the block breadcrumb\" feature.",
 
