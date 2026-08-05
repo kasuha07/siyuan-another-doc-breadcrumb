@@ -267,7 +267,8 @@ export class InlineBreadcrumbController {
 
     /**
      * 同行模式：相邻文档导航固定在 host 右侧按钮组（space 之后），
-     * 不随 bar 内容带滚动，也不受思源重写 bar innerHTML 的影响。
+     * 不随 bar 内容带滚动，也不受思源重写 bar innerHTML 的影响；
+     * 两行模式：nav 固定在插件容器右侧（root 之外），同样需要单独绑定。
      */
     bindNavEvents(nav: HTMLElement) {
         const signal = this.abortController.signal;
@@ -279,34 +280,35 @@ export class InlineBreadcrumbController {
     /**
      * 同步相邻文档导航：
      * - 同行模式：重建 host 右侧按钮组中的 nav（action registry 需随内容重建）；
-     * - 两行模式：保持原行为，nav 跟随 root 末尾渲染。
+     * - 两行模式：nav 固定于插件容器右侧（root 之外），不随面包屑滚动，
+     *   与同行模式一致始终可见。
      */
     syncAdjacentNav() {
         const adjacent = this.lastModel?.adjacent ?? null;
-        if (this.nativeBar) {
-            // 同行模式：固定于 host 右侧按钮组
-            let nav = this.adjacentNav;
-            if (!adjacent) {
-                nav?.remove();
-                this.adjacentNav = null;
-                return;
-            }
-            if (!nav || !nav.isConnected) {
-                nav = document.createElement("span");
-                nav.className = "og-fdb-doc-nav";
-                this.host?.insertBefore(nav, this.parts.space?.nextSibling ?? null);
-                this.adjacentNav = nav;
-                this.bindNavEvents(nav);
-            }
-            nav.textContent = "";
-            nav.appendChild(createAdjacentDocNav(adjacent, this));
-        } else if (this.root) {
-            // 两行模式：跟随 root 末尾渲染
-            this.root.querySelector(":scope > .og-fdb-doc-nav")?.remove();
-            if (adjacent) {
-                this.root.appendChild(createAdjacentDocNav(adjacent, this));
-            }
+        // 同行模式：host 右侧按钮组；两行模式：插件容器右侧
+        const parent = this.nativeBar ? this.host : this.wrapper;
+        if (!parent) {
+            return;
         }
+        if (!adjacent) {
+            this.adjacentNav?.remove();
+            this.adjacentNav = null;
+            return;
+        }
+        let nav = this.adjacentNav;
+        if (!nav || !nav.isConnected) {
+            nav = document.createElement("span");
+            nav.className = "og-fdb-doc-nav";
+            if (this.nativeBar) {
+                this.host?.insertBefore(nav, this.parts.space?.nextSibling ?? null);
+            } else {
+                this.wrapper?.appendChild(nav);
+            }
+            this.adjacentNav = nav;
+            this.bindNavEvents(nav);
+        }
+        nav.textContent = "";
+        nav.appendChild(createAdjacentDocNav(adjacent, this));
     }
 
     /**
@@ -382,7 +384,8 @@ export class InlineBreadcrumbController {
             return null;
         }
 
-        // 同行模式：相邻导航在 host 右侧按钮组中，不在 root 内
+        // 相邻导航（上一篇/下一篇）在两种模式下均位于 root 之外
+        // （同行：host 右侧按钮组；两行：插件容器右侧）
         if (this.root?.contains(target) || this.adjacentNav?.contains(target)) {
             return target;
         }

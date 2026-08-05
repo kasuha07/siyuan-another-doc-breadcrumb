@@ -139,6 +139,14 @@ export function setStyle() {
     min-block-size: 30px;
 }
 
+/* 两行模式：相邻导航固定于容器右侧（root 之外），不随面包屑滚动 */
+.og-fake-doc-breadcrumb-container.protyle-breadcrumb
+    > .og-fdb-doc-nav {
+    flex: 0 0 auto;
+    align-self: center;
+    margin-left: auto;
+}
+
 /* ===== 路径项与箭头 ===== */
 .og-fdb-inline__item,
 .og-fdb-inline__arrow {
