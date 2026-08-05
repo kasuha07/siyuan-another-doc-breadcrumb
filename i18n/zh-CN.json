@@ -29,8 +29,6 @@
     "setting_batchFixFocusError_desp": "【修复功能已上线半年，将在下个版本移除】请先打开“自动修复”，打开存在问题的文档确认自动修复功能正常可用；如果自动修复可以正常工作，点击右边按钮可以自动批量进行",
     "setting_notOnlyOpenDocs_name": "在更多情况下显示文档面包屑",
     "setting_notOnlyOpenDocs_desp": "除了正常打开文档之外，其他由<code>loaded-protyle</code>事件调起的编辑器也尝试插入文档面包屑；可能与其他插件、面板内编辑器产生冲突；⚠除非您了解发生了什么，否则请勿使用",
-    "setting_preferOpenInCurrentSplit_name": "在面包屑所在分屏区打开文档",
-    "setting_preferOpenInCurrentSplit_desp": "启用后，点击面包屑路径项、>菜单、折叠菜单或上一篇/下一篇按钮打开的文档将显示在面包屑所在的分屏区；禁用后，则在当前具有焦点的分屏区打开。注意：目标文档已打开在其他分屏区时，仍会切换到已有分屏，不会重复打开。",
     "setting_menuExtendSubDocDepth_name": "下层文档菜单扩展层级",
     "setting_menuExtendSubDocDepth_desp": "控制含子文档的菜单项可递归展开子菜单的最大层级数。值为1时表示仅显示直接子文档，不展开其子菜单；值越大，嵌套展开越深。有效范围：1–7。",
     "setting_showAdjacentDocButton_name": "显示上一篇/下一篇按钮",

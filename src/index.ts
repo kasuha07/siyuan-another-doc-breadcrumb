@@ -162,7 +162,6 @@ export class FakeDocBreadcrumb extends Plugin {
             new SettingProperty("allowFloatWindow", "SWITCH", null),
             new SettingProperty("usePluginArrow", "SWITCH", null),
             new SettingProperty("notOnlyOpenDocs", "SWITCH", null),
-            new SettingProperty("preferOpenInCurrentSplit", "SWITCH", null),
             new SettingProperty("icon", "SELECT", [
                 { value: 0 },
                 { value: 1 },

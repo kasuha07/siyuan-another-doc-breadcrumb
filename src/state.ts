@@ -39,7 +39,6 @@ export const state: StateShape = {
         "timelyUpdate": null, // 及时响应更新
         "allowFloatWindow": null,
         "usePluginArrow": null,
-        "preferOpenInCurrentSplit": null,
         "icon": null,
         "menuKeepCurrentVisible": null,
         "menuExtendSubDocDepth": null,

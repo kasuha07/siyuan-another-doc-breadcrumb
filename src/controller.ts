@@ -475,13 +475,11 @@ export class InlineBreadcrumbController {
     }
 
     dispatchAction(action: ControllerAction, target: Element, event: Event) {
-        if (state.g_setting.preferOpenInCurrentSplit) {
-            // 在面包屑所在分屏打开：先激活所在 wnd，openTab 才能落在正确分屏。
-            // 统一在入口处理，同时覆盖：路径项点击、> 子文档菜单/折叠菜单
-            // （菜单项点击走 openRefLinkByAPI，无分屏上下文，依赖此处预激活）、
-            // 上一篇/下一篇按钮。
-            activateProtyleWnd(this.protyle);
-        }
+        // 在面包屑所在分屏打开：先激活所在 wnd，openTab 才能落在正确分屏。
+        // 统一在入口处理，同时覆盖：路径项点击、> 子文档菜单/折叠菜单
+        // （菜单项点击走 openRefLinkByAPI，无分屏上下文，依赖此处预激活）、
+        // 上一篇/下一篇按钮。
+        activateProtyleWnd(this.protyle);
         switch (action.type) {
             case "open-document": {
                 const entry = action.entry;

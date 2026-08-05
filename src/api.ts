@@ -185,12 +185,11 @@ export async function sqlAPI(stmt: string) {
     return parseBody(request(url, data));
 }
 
-export function openRefLinkAgent(event: any, paramId = "", keyParam = undefined, protyleElem = undefined, openInFocus = !state.g_setting.preferOpenInCurrentSplit) {
+export function openRefLinkAgent(event: any, paramId = "", keyParam = undefined, protyleElem = undefined, openInFocus = false) {
     openRefLinkByAPI({
         mouseEvent: event,
         paramDocId: paramId,
         keyParam: keyParam,
-        preventDefault: !state.g_setting.preferOpenInCurrentSplit,
     });
 }
 
