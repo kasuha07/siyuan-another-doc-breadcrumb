@@ -2,7 +2,7 @@
   "name": "syplugin-fakeDocBreadcrumb",
   "author": "OpaqueGlass",
   "url": "https://github.com/OpaqueGlass/syplugin-fakeDocBreadcrumb",
-  "version": "2.3.0",
+  "version": "2.4.0",
   "minAppVersion": "3.7.0",
   "disabledInPublish": false,
   "backends": [

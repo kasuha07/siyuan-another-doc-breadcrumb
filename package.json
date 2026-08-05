@@ -1,6 +1,6 @@
 {
   "name": "syplugin-fakedocbreadcrumb",
-  "version": "2.3.0",
+  "version": "2.4.0",
   "description": "[中文](README_zh_CN.md) | **English**",
   "main": "index.js",
   "scripts": {
