@@ -36,7 +36,6 @@ export const g_setting_default = {
     "nameMaxLength": 15,
     "docMaxNum": 128,
     "showNotebook": true,
-    "typeHide": false,
     "foldedFrontShow": 2,
     "foldedEndShow": 3,
     "oneLineBreadcrumb": false,

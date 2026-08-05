@@ -13,9 +13,7 @@ export function initRetry() {
     let successFlag = false;
     try {
         removeStyle();
-        removeMouseKeyboardListener();
         setStyle();
-        setMouseKeyboardListener();
         successFlag = true;
         clearTimeout(state.g_initFailedMsgTimeout);
     } catch (e) {
@@ -113,35 +111,4 @@ export function refreshAllShowingProtyles() {
     }
 }
 
-export function setMouseKeyboardListener() {
-    if (state.g_setting.typeHide) {
-        window.document.addEventListener("mousemove", showDocBreadcrumb);
-        window.document.addEventListener("keydown", hideDocBreadcrumb, true);
-    }
-}
 
-export function hideDocBreadcrumb(event: any) {
-    if (!state.g_hidedBreadcrumb) {
-        if (event.ctrlKey || event.shiftKey || event.altKey) return;
-        const fakeBreadcrumb = window.document.querySelectorAll(`.${CONSTANTS.CONTAINER_CLASS_NAME}, .${CONSTANTS.INLINE_BREADCRUMB_CLASS_NAME}, .og-fdb-doc-nav`);
-        [].forEach.call(fakeBreadcrumb, (e: HTMLElement) => {
-            e.classList.add("og-hide-breadcrumb");
-        });
-        state.g_hidedBreadcrumb = true;
-    }
-}
-
-export function showDocBreadcrumb() {
-    if (state.g_hidedBreadcrumb) {
-        const fakeBreadcrumb = window.document.querySelectorAll(`.${CONSTANTS.CONTAINER_CLASS_NAME}, .${CONSTANTS.INLINE_BREADCRUMB_CLASS_NAME}, .og-fdb-doc-nav`);
-        [].forEach.call(fakeBreadcrumb, (e: HTMLElement) => {
-            e.classList.remove("og-hide-breadcrumb");
-        });
-        state.g_hidedBreadcrumb = false;
-    }
-}
-
-export function removeMouseKeyboardListener() {
-    window.document.removeEventListener("mousemove", showDocBreadcrumb);
-    window.document.removeEventListener("keydown", hideDocBreadcrumb, true);
-}

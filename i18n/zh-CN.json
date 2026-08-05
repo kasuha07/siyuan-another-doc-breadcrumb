@@ -3,8 +3,6 @@
     "setting_nameMaxLength_desp": "子文档菜单中文档名超出的部分将被删除。设置为0则不限制。（单位：字符）",
     "setting_docMaxNum_name": "文档最大数量",
     "setting_docMaxNum_desp": "当子文档或同级文档超过该值时，后续文档将不再显示。设置为0则不限制。",
-    "setting_typeHide_name": "输入时隐藏",
-    "setting_typeHide_desp": "开启后，输入时将隐藏文档面包屑，但可能导致性能问题。",
     "setting_showNotebook_name": "显示笔记本层级",
     "setting_showNotebook_desp": "",
     "setting_showRoot_name": "显示根层级（工作空间）",

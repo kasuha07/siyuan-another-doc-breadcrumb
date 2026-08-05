@@ -28,7 +28,7 @@ import { generateSettingPanel, loadUISettings, SettingProperty } from "./setting
 import { removeStyle, setStyle } from "./style";
 import { destroyAllControllers } from "./controller";
 import { removeAdjacentTooltip } from "./adjacent";
-import { eventBusHandler, handleDestroyProtyle, initRetry, mainEventBusHander, refreshAllShowingProtyles, removeMouseKeyboardListener, setMouseKeyboardListener } from "./events";
+import { eventBusHandler, handleDestroyProtyle, initRetry, mainEventBusHander, refreshAllShowingProtyles } from "./events";
 import { isMobile, isSomePluginExist } from "./utils";
 
 /**
@@ -103,7 +103,6 @@ export class FakeDocBreadcrumb extends Plugin {
         });
         (this as any).el && (this as any).el.remove();
         removeStyle();
-        removeMouseKeyboardListener();
         this.offEventBusInnerHander();
     }
 
@@ -135,8 +134,6 @@ export class FakeDocBreadcrumb extends Plugin {
                 Object.assign(state.g_setting, uiSettings);
                 removeStyle();
                 setStyle();
-                removeMouseKeyboardListener();
-                setMouseKeyboardListener();
                 // 销毁全部 presentation，以新设置重新挂载
                 destroyAllControllers();
                 refreshAllShowingProtyles();
@@ -155,7 +152,6 @@ export class FakeDocBreadcrumb extends Plugin {
             new SettingProperty("nameMaxLength", "NUMBER", [0, 1024]),
             new SettingProperty("showNotebook", "SWITCH", null),
             new SettingProperty("showRoot", "SWITCH", null),
-            new SettingProperty("typeHide", "SWITCH", null),
             new SettingProperty("oneLineBreadcrumb", "SWITCH", null),
             new SettingProperty("foldedFrontShow", "NUMBER", [0, 8]),
             new SettingProperty("foldedEndShow", "NUMBER", [0, 8]),

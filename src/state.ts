@@ -13,7 +13,6 @@ export interface StateShape {
     g_pluginInstance: any;
     g_relativeMenu: any;
     g_isMobile: boolean;
-    g_hidedBreadcrumb: boolean;
     g_setting: { [key: string]: any };
     language: { [key: string]: string };
     g_adjacentDocCache: { [key: string]: any };
@@ -27,12 +26,10 @@ export const state: StateShape = {
     g_pluginInstance: undefined,
     g_relativeMenu: undefined,
     g_isMobile: false,
-    g_hidedBreadcrumb: false,
     g_setting: {
         "nameMaxLength": null,
         "docMaxNum": null,
         "showNotebook": null,
-        "typeHide": null,
         "foldedFrontShow": null,
         "foldedEndShow": null,
         "oneLineBreadcrumb": null,

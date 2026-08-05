@@ -218,12 +218,6 @@ export function setStyle() {
     height: 16px;
 }
 
-/* ===== 输入时隐藏 ===== */
-.og-hide-breadcrumb {
-    opacity: 0;
-    transition: 1s;
-}
-
 /* ===== 相邻文档导航 ===== */
 .og-fdb-doc-nav {
     display: inline-flex;
