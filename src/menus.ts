@@ -8,6 +8,13 @@ import { createAndOpenEmptyDocAt, getChildDocuments, openRefLinkByAPI } from "./
 import { decodeHtmlEntities, getEmojiHtmlStr, isNotebookDocEnabled, trimListDocsByPathAPIReturnedDocName } from "./utils";
 
 /**
+ * 非空断言（!）说明：
+ * - window.siyuan.notebooks!/languages!：siyuan 类型声明为可选，但思源运行时必然注入；
+ * - getAttribute(...)!：查询选择器已限定元素必带对应 data-* 属性
+ *   （此处为 data-has-children="true" 且未加载的子菜单项，data-doc-id / data-path / data-box 必已写入）。
+ */
+
+/**
  * 打开折叠区域的隐藏文档菜单
  */
 export function openHideMenu({ anchorElement, hiddenEntries }: any, event: any) {
@@ -105,7 +112,7 @@ export async function openRelativeMenu({ protyle, anchorElement, parentId, nextI
         }];
         siblings = await getChildDocuments(id, sqlResult);
     } else {
-        siblings = window.siyuan.notebooks.filter(item => item.closed == false);
+        siblings = window.siyuan.notebooks!.filter(item => item.closed == false);
     }
     if (siblings.length <= 0) return;
 
@@ -115,7 +122,7 @@ export async function openRelativeMenu({ protyle, anchorElement, parentId, nextI
     if (state.g_setting.createDocBtnInMenu && type !== "ROOT") {
         let tempMenuItemObj: any = {
             icon: `iconAdd`,
-            label: `<span class="${CONSTANTS.MENU_ITEM_CLASS_NAME}">${window.siyuan.languages.newFile}</span>`,
+            label: `<span class="${CONSTANTS.MENU_ITEM_CLASS_NAME}">${window.siyuan.languages!.newFile}</span>`,
             click: (htmlElement: any, event: any) => {
                 event.preventDefault();
                 event.stopImmediatePropagation();
@@ -228,9 +235,9 @@ export function addLazyLoadEventListeners(menuElement: Element, maxDepth: number
 
         // 悬停加载
         menuItemElement.addEventListener('mouseover', async function handleMouseOver(e) {
-            const docId = item.getAttribute('data-doc-id');
-            const path = item.getAttribute('data-path');
-            const box = item.getAttribute('data-box');
+            const docId = item.getAttribute('data-doc-id')!;
+            const path = item.getAttribute('data-path')!;
+            const box = item.getAttribute('data-box')!;
             const isLoaded = item.getAttribute('data-loaded') === 'true';
 
             if (isLoaded || currentDepth >= maxDepth) return;
@@ -269,7 +276,7 @@ export function addLazyLoadEventListeners(menuElement: Element, maxDepth: number
             // title
             const docTitleEl = document.createElement('span');
             docTitleEl.className = `${CONSTANTS.MENU_ITEM_CLASS_NAME}`;
-            docTitleEl.textContent = window.siyuan.languages.newFile;
+            docTitleEl.textContent = window.siyuan.languages!.newFile;
             labelEl.appendChild(docTitleEl);
             menuItemEl.appendChild(labelEl);
             submenuContainer.appendChild(menuItemEl);

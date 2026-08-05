@@ -5,6 +5,13 @@ import { CONSTANTS } from "./constants";
 import { errorPush, debugPush } from "./logger";
 import { state } from "./state";
 
+/**
+ * 非空断言（!）说明：
+ * - window.top!：插件运行于思源 iframe 内，window.top 必为顶层布局窗口，不会为 null；
+ * - window.siyuan.storage!/config!：siyuan 类型声明这些为可选属性，
+ *   但思源内核初始化时必然注入（含移动端），断言仅消除类型收窄，不影响运行时行为。
+ */
+
 /*** Utils ***/
 
 export function isSomePluginExist(pluginList: any, checkPluginName: string[]) {
@@ -29,11 +36,11 @@ export function getEmojiHtmlStr(iconString: any, hasChild: boolean, textClassNam
     if (state.g_setting.icon == CONSTANTS.ICON_NONE) return ``;
     // 无自定义图标时显示默认图标，避免空白占位（仅自定义 / 显示全部均适用）
     if (iconString == undefined || iconString == null || iconString == "") {
-        if (window.siyuan.storage["local-images"]) {
+        if (window.siyuan.storage!["local-images"]) {
             if (hasChild) {
-                return getEmojiHtmlStr(window.siyuan.storage["local-images"].folder, hasChild, textClassName, picClassName, wrapText);
+                return getEmojiHtmlStr(window.siyuan.storage!["local-images"].folder, hasChild, textClassName, picClassName, wrapText);
             } else {
-                return getEmojiHtmlStr(window.siyuan.storage["local-images"].file, hasChild, textClassName, picClassName, wrapText);
+                return getEmojiHtmlStr(window.siyuan.storage!["local-images"].file, hasChild, textClassName, picClassName, wrapText);
             }
         }
         if (hasChild) {
@@ -93,14 +100,14 @@ export function getAllShowingDocId() {
 
 export function getCurrentDocIdF(forceGetID = false) {
     let thisDocId: string | null = null;
-    thisDocId = window.top.document.querySelector(".layout__wnd--active .protyle.fn__flex-1:not(.fn__none) .protyle-background")?.getAttribute("data-node-id");
+    thisDocId = window.top!.document.querySelector(".layout__wnd--active .protyle.fn__flex-1:not(.fn__none) .protyle-background")?.getAttribute("data-node-id") ?? null;
     debugPush("thisDocId by first id", thisDocId);
     let temp: string | null = null;
     if (!thisDocId && isMobile()) {
         // UNSTABLE: 面包屑样式变动将导致此方案错误！
         try {
-            temp = window.top.document.querySelector(".protyle-breadcrumb .protyle-breadcrumb__item .popover__block[data-id]")?.getAttribute("data-id");
-            let iconArray = window.top.document.querySelectorAll(".protyle-breadcrumb .protyle-breadcrumb__item .popover__block[data-id]");
+            temp = window.top!.document.querySelector(".protyle-breadcrumb .protyle-breadcrumb__item .popover__block[data-id]")?.getAttribute("data-id") ?? null;
+            let iconArray = window.top!.document.querySelectorAll(".protyle-breadcrumb .protyle-breadcrumb__item .popover__block[data-id]");
             for (let i = 0; i < iconArray.length; i++) {
                 let iconOne = iconArray[i];
                 if (iconOne.children.length > 0
@@ -116,7 +123,7 @@ export function getCurrentDocIdF(forceGetID = false) {
         }
     }
     if (!thisDocId) {
-        thisDocId = window.top.document.querySelector(".protyle.fn__flex-1:not(.fn__none) .protyle-background")?.getAttribute("data-node-id");
+        thisDocId = window.top!.document.querySelector(".protyle.fn__flex-1:not(.fn__none) .protyle-background")?.getAttribute("data-node-id") ?? null;
         debugPush("thisDocId by background must match,  id", thisDocId);
     }
     return thisDocId;
@@ -160,7 +167,7 @@ export function getPluginInstance() {
 }
 let cacheIsMacOs: boolean | undefined;
 export function isMacOs() {
-    let platform = window.top.siyuan.config.system.os ?? navigator.platform ?? "ERROR";
+    let platform: string = window.top!.siyuan.config!.system.os ?? navigator.platform ?? "ERROR";
     platform = platform.toUpperCase();
     let isMacOSFlag = cacheIsMacOs;
     if (cacheIsMacOs == undefined) {
@@ -193,7 +200,7 @@ export function isValidStr(s: any) {
 }
 
 export function isMobile() {
-    return window.top.document.getElementById("sidebar") ? true : false;
+    return window.top!.document.getElementById("sidebar") ? true : false;
 };
 
 /**
@@ -216,7 +223,7 @@ export const parseVersion = (version: string) => {
  */
 export function isCurrentVersionLessThan(version: string) {
     const parsedInputVersion = parseVersion(version);
-    const parsedCurrentVersion = parseVersion(window.siyuan.config.system.kernelVersion);
+    const parsedCurrentVersion = parseVersion(window.siyuan.config!.system.kernelVersion);
     const len = Math.max(parsedCurrentVersion.length, parsedInputVersion.length);
     for (let i = 0; i < len; i++) {
         const currentPart = parsedCurrentVersion[i] || 0;
@@ -243,10 +250,10 @@ export function trimListDocsByPathAPIReturnedDocName(docName: string) {
 
 // 兼容性utils
 export function isNotebookDocEnabled() {
-    if (window.top.siyuan.config?.fileTree.boxDocEnabled === undefined) {
+    if (window.top!.siyuan.config?.fileTree.boxDocEnabled === undefined) {
         return false;
     }
-    return window.top.siyuan.config.fileTree.boxDocEnabled;
+    return window.top!.siyuan.config.fileTree.boxDocEnabled;
 }
 
 export function isNotebookDoc(path: string, notebookId: string) {

@@ -150,13 +150,14 @@ async function isChildDocExist(protyle: any, id: any) {
 }
 
 export async function parseDocPath(docDetail: any): Promise<PathObject[]> {
-    let docPath = getListDocsByPathAPIFilePath(docDetail.path, docDetail.box);
+    // getListDocsByPathAPIFilePath 仅当入参 fullPath 为 null 时才返回 null；docDetail.path 由 API 返回必然存在
+    let docPath = getListDocsByPathAPIFilePath(docDetail.path, docDetail.box)!;
     let pathArray = docPath.substring(0, docPath.length - 3).split("/");
     // 处理并发意外
     let hpath = docDetail.hpath ?? await getHPathByID(docDetail.docId);
     let hpathArray = hpath.split("/");
     let resultArray: PathObject[] = [];
-    let notebooks = getNotebooks();
+    let notebooks = getNotebooks() ?? [];
     let box: any;
     for (let notebook of notebooks) {
         if (notebook.id == docDetail.box) {

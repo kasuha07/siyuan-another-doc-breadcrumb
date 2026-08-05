@@ -43,12 +43,12 @@ export interface AdjacentResult {
     sameLevelNext: boolean;
 }
 
-/** controller 内部注册的 action */
-export interface ControllerAction {
-    type: string;
-    entry?: BreadcrumbEntry;
-    docId?: string;
-}
+/** controller 内部注册的 action（判别联合：type 决定携带的字段） */
+export type ControllerAction =
+    | { type: "open-document"; entry: BreadcrumbEntry }
+    | { type: "open-collapsed-menu"; entry: BreadcrumbEntry }
+    | { type: "open-relative-menu"; entry: BreadcrumbEntry }
+    | { type: "open-adjacent"; docId: string };
 
 /** 渲染层需要的 controller 最小接口（避免循环依赖） */
 export interface ActionRegistrar {

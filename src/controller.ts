@@ -170,7 +170,9 @@ export class InlineBreadcrumbController {
         }
         this.parts = parts;
 
-        parts.host.querySelectorAll(
+        // 泛型限定元素为 HTMLElement：插件渲染的容器均为 HTMLElement，
+        // 与下方 forEach 回调参数类型保持一致（querySelectorAll 默认返回 NodeListOf<Element>）
+        parts.host.querySelectorAll<HTMLElement>(
             `:scope > .${CONSTANTS.INLINE_BREADCRUMB_CLASS_NAME},` +
             `:scope > .${CONSTANTS.CONTAINER_CLASS_NAME},` +
             ":scope > .og-breadcrumb-oneline-divider"
@@ -184,7 +186,7 @@ export class InlineBreadcrumbController {
             this.host = parts.host;
             this.nativeBar = parts.nativeBar;
             this.host.classList.add(CONSTANTS.HOST_STATE_CLASS_NAME);
-            parts.nativeBar.querySelectorAll(`:scope > .${CONSTANTS.INLINE_BREADCRUMB_CLASS_NAME}`)
+            parts.nativeBar.querySelectorAll<HTMLElement>(`:scope > .${CONSTANTS.INLINE_BREADCRUMB_CLASS_NAME}`)
                 .forEach((element: HTMLElement) => element.remove());
             this.root = createInlineRoot();
             parts.nativeBar.insertBefore(this.root, parts.nativeBar.firstElementChild);

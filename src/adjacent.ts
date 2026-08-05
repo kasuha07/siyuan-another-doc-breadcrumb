@@ -135,7 +135,7 @@ export async function getNotebookAdjacentDocs(notebookId: string, cache: any = n
         return state.g_adjacentDocCache[cacheKey].data;
     }
     const notebookList = await getNodebookList() ?? [];
-    const result = notebookList.filter(notebook => notebook.closed == false);
+    const result = notebookList.filter((notebook: any) => notebook.closed == false);
     // 面包屑情况下不太需要详细信息，这里先不调用信息补全了
     // await fillNotebookDocFileInfo(notebookList.filter(notebook=>notebook.closed==false));
     if (cache) {
@@ -169,7 +169,7 @@ export async function getAdjacentChildDocs(parentDoc: any, cache: any = null) {
         notebook: parentDoc.box,
         ignoreDocMaxNum: true,
     });
-    const processedResponse = (response?.files ?? []).map(doc => {
+    const processedResponse = (response?.files ?? []).map((doc: any) => {
         doc["box"] = parentDoc.box;
         return doc;
     });

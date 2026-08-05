@@ -4,7 +4,8 @@
   "description": "[中文](README_zh_CN.md) | **English**",
   "main": "index.js",
   "scripts": {
-    "build": "node scripts/clean.js && esbuild src/index.ts --bundle --platform=node --format=cjs --target=es2017 --external:siyuan --outfile=dist/index.js && node scripts/copy-assets.js",
+    "build": "npm run typecheck && node scripts/clean.js && esbuild src/index.ts --bundle --platform=node --format=cjs --target=es2017 --external:siyuan --outfile=dist/index.js && node scripts/copy-assets.js",
+    "typecheck": "tsc --noEmit",
     "verify": "node scripts/verify.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },

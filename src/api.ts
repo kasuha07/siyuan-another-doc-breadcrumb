@@ -2,13 +2,20 @@
  * 思源 API 封装与打开文档相关逻辑
  */
 import { Constants, openTab, showMessage } from "siyuan";
+
+/**
+ * 非空断言（!）说明：
+ * - window.top!：插件运行于思源 iframe 内，window.top 必为顶层布局窗口；
+ * - window.siyuan.languages!/storage!：siyuan 类型声明为可选，但思源运行时必然注入；
+ * - (window as any)["OG_FDB_NO_WARNING"]：跨插件约定的全局标记，Window 类型无对应索引签名。
+ */
 import * as siyuan from "siyuan";
 import { debugPush, errorPush, logPush, warnPush } from "./logger";
 import { state } from "./state";
 import { getCurrentDocIdF, getPluginInstance, isEventCtrlKey, isMobile, isValidStr, sleep } from "./utils";
 
 export function getNotebooks() {
-    let notebooks = window.top.siyuan.notebooks;
+    let notebooks = window.top!.siyuan.notebooks;
     return notebooks;
 }
 
@@ -100,7 +107,7 @@ export async function parseBody(response: any) {
 
 export async function createAndOpenEmptyDocAt(box: string, path: string) {
     const newPath = (path.endsWith(".sy") ? path.substring(0, path.length - 3) + "/" : path) + window.Lute.NewNodeID() + ".sy";
-    createDoc(box, newPath, window.siyuan.languages.untitled, "", true).then((response) => {
+    createDoc(box, newPath, window.siyuan.languages!.untitled, "", true).then((response) => {
         if (response && response.id) {
             openRefLinkByAPI({
                 paramDocId: response.id,
@@ -190,14 +197,14 @@ export async function tryToFixAllError() {
     } else {
         showMessage(state.language["closeOtherDialog"] + " --- fakeDocBreadcrumb");
     }
-    if (window["OG_FDB_NO_WARNING"] == true) {
+    if ((window as any)["OG_FDB_NO_WARNING"] == true) {
         showMessage(state.language["onlyOneRunning"] + " --- fakeDocBreadcrumb");
         return;
     }
     try {
-        window["OG_FDB_NO_WARNING"] = true;
+        (window as any)["OG_FDB_NO_WARNING"] = true;
         showMessage(state.language["batchFixStart"] + "--- fakeDocBreadcrumb")
-        const list = window.siyuan.storage["local-fileposition"];
+        const list = window.siyuan.storage!["local-fileposition"];
         if (list) {
             for (let key in list) {
                 if (list.hasOwnProperty(key)) {
@@ -213,8 +220,8 @@ export async function tryToFixAllError() {
     } catch (err) {
         errorPush(err);
     } finally {
-        showMessage(state.language["batchFixEnd"] + "--- fakeDocBreadcrumb")
-        window["OG_FDB_NO_WARNING"] = false;
+        showMessage(state.language["batchFixEnd"] + "--- fakeDocBreadcrumb");
+        (window as any)["OG_FDB_NO_WARNING"] = false;
     }
 
 }
@@ -303,7 +310,7 @@ export function openRefLinkByAPI({ mouseEvent, paramDocId = "", keyParam = {}, o
     }
 }
 
-export function removeCurrentTabF(docId: string) {
+export function removeCurrentTabF(docId: string | null) {
     // 获取tabId
     if (!isValidStr(docId)) {
         docId = getCurrentDocIdF(true);

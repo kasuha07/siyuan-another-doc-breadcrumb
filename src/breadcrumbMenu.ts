@@ -71,7 +71,7 @@ export async function addBlockBdMenuListener(protyle: any) {
             if (iconHref === '#iconFile') {
                 // 如果是文档图标，显示所有顶级标题
                 logPush("目标是文档根节点，筛选所有顶级标题 (depth: 0)...");
-                menuItems = outlineData.filter(item => item.depth === 0);
+                menuItems = outlineData.filter((item: any) => item.depth === 0);
             } else if (iconHref.startsWith('#iconH')) {
                 // 如果是标题图标 (H1-H6)，显示其下的直接子标题
                 logPush(`目标是标题节点，查找 ID: ${nodeId} 的子标题...`);

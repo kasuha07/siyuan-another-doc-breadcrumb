@@ -177,7 +177,8 @@ export class FakeDocBreadcrumb extends Plugin {
         ]));
 
         hello.appendChild(settingForm);
-        settingDialog.element.querySelector(`#${CONSTANTS.PLUGIN_NAME}-form-content`).appendChild(hello);
+        // 设置表单容器由下方 createElement 创建并挂入 element，查询结果必然存在
+        settingDialog.element.querySelector(`#${CONSTANTS.PLUGIN_NAME}-form-content`)!.appendChild(hello);
     }
 
     /**
