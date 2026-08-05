@@ -178,7 +178,7 @@ export function setStyle() {
     height: 24px;
     justify-content: center;
     margin: 3px 0;
-    padding: 0 2px;
+    padding: 0 4px;
     pointer-events: none;
     user-select: none;
 }
