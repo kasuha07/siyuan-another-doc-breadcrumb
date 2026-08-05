@@ -1,5 +1,16 @@
 ## 更新日志
 
+### v2.0.0 (2026年7月29日)
+
+- 重构：“与块面包屑在同一行显示”功能完整重构，仅支持思源 v3.7.0+；
+- 架构：引入 InlineBreadcrumbController（事件代理、action registry、revision token、滚动恢复、完整销毁）；
+- 渲染：路径由 ViewModel + DOM API 构建，不再拼接 HTML 字符串；
+- 布局：两个面包屑宽度分配完全交给 Flexbox（`flex-basis: max-content`），不再用 JS 计算像素宽度；插件内容作为原生 bar 的第一个 flex 子项插入，bar 成为唯一滚动容器，形成连续内容带整体滚动；思源重写 bar 的 innerHTML 后由 MutationObserver 恢复插件内容并保持滚动位置；
+- DOM：插件根节点不再使用 `.protyle-breadcrumb__bar` 类，不再创建独立分隔线 DOM；原生 bar、space、右侧按钮保持不动；
+- 异步：以 controller revision token 取代全局互斥锁，快速切换文档不再出现旧路径覆盖；
+- 生命周期：监听 `destroy-protyle` 事件，Protyle 销毁、插件卸载、设置切换后无残留节点；
+- 移除：v3.7.0 以前兼容分支、动态样式、旧版节点迁移清理、下线提示弹窗；
+
 ### v1.5.1 (2026年7月28日)
 
 - 修复：分隔符在刷新时未移除的问题；

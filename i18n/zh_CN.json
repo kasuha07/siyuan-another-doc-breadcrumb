@@ -9,8 +9,8 @@
     "setting_showNotebook_desp": "",
     "setting_showRoot_name": "显示根层级（工作空间）",
     "setting_showRoot_desp": "不支持切换工作空间，仅用于浏览笔记本",
-    "setting_oneLineBreadcrumb_name": "❌与块面包屑在同一行显示",
-    "setting_oneLineBreadcrumb_desp": "（将在下个大版本移除）启用后，可能出现在面包屑过长时和块面包屑的兼容异常",
+    "setting_oneLineBreadcrumb_name": "与块面包屑在同一行显示",
+    "setting_oneLineBreadcrumb_desp": "启用后，文档面包屑与块面包屑显示在同一行；超长时作为一条连续内容带整体横向滚动",
     "setting_foldedFrontShow_name": "始终保留靠前的N个文档",
     "setting_foldedFrontShow_desp": "在文档层级过深时，将隐藏中间的部分文档。通过更改该设置，可以避免一些文档被隐藏。",
     "setting_foldedEndShow_name": "始终保留靠后的N个文档",
@@ -70,10 +70,8 @@
     "loading": "加载中...",
     "no_doc": "没有文档",
 
-    "update_title": "文档面包屑插件已更新至新版本",
-    "update_content": "开发者计划在下个大版本下线“与块面包屑在同一行显示”功能，插件检测到您在使用该功能，可以前往讨论反馈： <a href=\"https://github.com/OpaqueGlass/syplugin-fakeDocBreadcrumb/issues/40\">https://github.com/OpaqueGlass/syplugin-fakeDocBreadcrumb/issues/40</a></p>",
-    "update_confirm": "我知道了",
-    "update_canel": "无所谓",
+    "documentBreadcrumb": "文档路径",
+    "arrow_menu": "展开子文档菜单",
 
     "root": "/",
     "workspace": "工作区",

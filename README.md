@@ -24,6 +24,8 @@
 
 - No support for Android or other mobile Device;
 - You can browse the settings on the plugin settings page. Just a tip, the settings page can be scrolled up and down.
+- Requires SiYuan v3.7.0+;
+- With "Display the document breadcrumb on the same line as the block breadcrumb" enabled, the two breadcrumbs share one line and scroll horizontally as one continuous strip when overflowing; otherwise the document breadcrumb stays on its own line above the block breadcrumb.
 
 ## Feedback bugs
 
