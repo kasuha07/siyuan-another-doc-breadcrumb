@@ -32,13 +32,13 @@ export const CONSTANTS = {
 }
 
 export const g_setting_default = {
-    "@version": 20260805,
+    "@version": 20260806,
     "nameMaxLength": 15,
     "docMaxNum": 128,
     "showNotebook": true,
     "foldedFrontShow": 2,
     "foldedEndShow": 3,
-    "oneLineBreadcrumb": false,
+    "oneLineBreadcrumb": true,
     "timelyUpdate": true, // 及时响应更新
     "immediatelyUpdate": false, // 实时响应更新
     "allowFloatWindow": false, // 触发浮窗
