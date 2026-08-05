@@ -72,6 +72,7 @@
 
     "loading": "加载中...",
     "no_doc": "没有文档",
+    "loadFailed": "加载失败，移开鼠标后重试",
 
     "documentBreadcrumb": "文档路径",
     "arrow_menu": "展开子文档菜单",

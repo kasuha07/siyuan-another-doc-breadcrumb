@@ -9,7 +9,7 @@ import { logPush, errorPush } from "./logger";
 import { state } from "./state";
 import { getDocOutline } from "./api";
 import { escapeHTML, getPluginInstance, stripHTML } from "./utils";
-import { checkAndCloseLastMenu, saveLastMenu } from "./menus";
+import { guardMenuOpen, menuCloseCB, saveLastMenu } from "./menus";
 
 export async function addBlockBdMenuListener(protyle: any) {
     // 限制范围，避免影响插件插入的面包屑
@@ -54,15 +54,24 @@ export async function addBlockBdMenuListener(protyle: any) {
 
         logPush(`点击了 ID: ${nodeId} (${iconHref}) 旁边的箭头`);
         const menuId = "bid_" + nodeId;
-        if (!checkAndCloseLastMenu(menuId)) {
+        if (!guardMenuOpen(menuId)) {
             return;
         }
+        // 占位标记：getDocOutline 为异步，期间若用户再次触发其他菜单，
+        // 后打开的调用会覆盖此占位；await 结束后凭 id 比对决定是否放弃本次打开，
+        // 避免与相对文档菜单并发操作共享的 #commonMenu 相互清空
+        state.g_relativeMenu = { "menu": null, "id": menuId };
         try {
             // 获取文档大纲
             const outlineData = await getDocOutline(docId);
+            // 加载期间已有更新的菜单被打开（或本菜单已被关闭），放弃本次打开
+            if (!state.g_relativeMenu || state.g_relativeMenu["id"] !== menuId) {
+                return;
+            }
 
             let menuItems: any[] = [];
             if (outlineData == null) {
+                state.g_relativeMenu = null;
                 logPush("获取大纲数据失败或文档无大纲。");
                 showMessage(state.language["nothingToDisplay"] + "--- fakeDocBreadcrumb");
                 return;
@@ -104,6 +113,7 @@ export async function addBlockBdMenuListener(protyle: any) {
                 }
             } else {
                 logPush(`点击了非文档或标题图标 (${iconHref}) 旁的箭头，不作处理。`);
+                state.g_relativeMenu = null;
                 showMessage(state.language["nothingToDisplay"] + "--- fakeDocBreadcrumb");
                 return;
             }
@@ -153,10 +163,16 @@ export async function addBlockBdMenuListener(protyle: any) {
                 });
             }
 
+            // 面包屑可能已在加载期间被重绘（原生 render 会重写 bar 的 innerHTML），
+            // 箭头元素已脱离文档，放弃本次打开
+            if (!arrowElement.isConnected) {
+                state.g_relativeMenu = null;
+                return;
+            }
             // 打开菜单
             let rect = arrowElement.getBoundingClientRect();
             if (menuItems.length > 0) {
-                const tempMenu = new Menu("og-fdb-relative-menu");
+                const tempMenu = new Menu("og-fdb-relative-menu", menuCloseCB);
                 const menuItemsToAdd = buildMenuItems(menuItems);
 
                 menuItemsToAdd.forEach(menuItem => {
@@ -172,12 +188,16 @@ export async function addBlockBdMenuListener(protyle: any) {
 
                 saveLastMenu(tempMenu, menuId);
             } else {
+                state.g_relativeMenu = null;
                 logPush("没有可供显示的菜单项。");
                 showMessage(state.language["nothingToDisplay"] + "--- fakeDocBreadcrumb");
             }
 
         } catch (error) {
             errorPush("获取或处理大纲数据时出错:", error);
+            if (state.g_relativeMenu && state.g_relativeMenu["id"] === menuId) {
+                state.g_relativeMenu = null;
+            }
         }
     });
 }

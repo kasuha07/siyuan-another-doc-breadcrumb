@@ -70,6 +70,7 @@
 
     "loading": "Loading...",
     "no_doc": "No Document",
+    "loadFailed": "Failed to load, hover again to retry",
     "nothingToDisplay": "Nothing to show",
     "previous_doc": "Previous document",
     "next_doc": "Next document",

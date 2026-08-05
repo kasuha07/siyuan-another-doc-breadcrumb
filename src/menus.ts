@@ -80,6 +80,29 @@ export function checkAndCloseLastMenu(id: string) {
     }
     return true;
 }
+
+/**
+ * 菜单打开前的统一守卫：
+ * - 同一菜单正在加载中（占位 menu 为 null）时忽略重复触发（连点/双击），
+ *   避免“先 await 完成者打开菜单、后完成者的 checkAndCloseLastMenu 又把刚打开的菜单关闭”；
+ * - 否则检查并关闭上一个打开的菜单。
+ * 调用方通过返回 true 后应设置占位标记（g_relativeMenu = { menu: null, id }）。
+ */
+export function guardMenuOpen(id: string): boolean {
+    // 同一菜单正在加载中（占位 menu 为 null），忽略重复触发
+    if (state.g_relativeMenu && state.g_relativeMenu["id"] === id && state.g_relativeMenu["menu"] === null) {
+        return false;
+    }
+    return checkAndCloseLastMenu(id);
+}
+
+/**
+ * SDK Menu 构造会立即清空共享的 #commonMenu；通过 closeCB 感知菜单被关闭
+ * （含被外部菜单/其他插件覆盖），同步清理 state，避免残留引用指向已清空的菜单。
+ */
+export function menuCloseCB() {
+    state.g_relativeMenu = null;
+}
 export function saveLastMenu(menuObj: any, id: string) {
     state.g_relativeMenu = { "menu": menuObj, "id": id };
 }
@@ -109,7 +132,7 @@ export async function openRelativeMenu({ protyle, anchorElement, parentId, nextI
         rect = anchorElement.nextElementSibling.getBoundingClientRect();
     }
 
-    if (!checkAndCloseLastMenu(id)) {
+    if (!guardMenuOpen(id)) {
         return;
     }
     // 占位标记：getChildDocuments 为异步，期间若用户再次触发其他菜单，
@@ -131,7 +154,9 @@ export async function openRelativeMenu({ protyle, anchorElement, parentId, nextI
         }
     } catch (err) {
         errorPush(err);
-        state.g_relativeMenu = null;
+        if (state.g_relativeMenu && state.g_relativeMenu["id"] === id) {
+            state.g_relativeMenu = null;
+        }
         return;
     }
     // 加载期间已有更新的菜单被打开，放弃本次打开
@@ -143,7 +168,7 @@ export async function openRelativeMenu({ protyle, anchorElement, parentId, nextI
         return;
     }
 
-    const tempMenu = new Menu("og-fdb-relative-menu");
+    const tempMenu = new Menu("og-fdb-relative-menu", menuCloseCB);
     // 创建新文档
     // 只读模式这里也是显示创建按钮的
     if (state.g_setting.createDocBtnInMenu && type !== "ROOT" && !isCreateDocDepthLimited(path)) {
@@ -280,9 +305,25 @@ export function addLazyLoadEventListeners(menuElement: Element, maxDepth: number
 
             submenuContainer.innerHTML = '';
 
-            // 加载子文档
-            const sqlResult = [{ path, box }];
-            const childDocuments = await getChildDocuments(docId, sqlResult);
+            let childDocuments: any[];
+            try {
+                // 加载子文档
+                const sqlResult = [{ path, box }];
+                childDocuments = await getChildDocuments(docId, sqlResult);
+            } catch (err) {
+                // 加载失败（网络/kernel 错误、文档已删除等）：重置标记允许移开鼠标后重试，并给出可见提示
+                errorPush(err);
+                item.setAttribute('data-loaded', 'false');
+                if (menuItemElement.isConnected) {
+                    submenuContainer.innerHTML = `<button class="b3-menu__item" disabled><span class="b3-menu__label">${state.language["loadFailed"] ?? state.language["no_doc"]}</span></button>`;
+                }
+                return;
+            }
+
+            // 加载期间菜单已被关闭（#commonMenu 被其他菜单复用，内容已清空），放弃填充
+            if (!menuItemElement.isConnected) {
+                return;
+            }
 
             if (!childDocuments || childDocuments.length === 0) {
                 submenuContainer.innerHTML = `<button class="b3-menu__item" disabled><span class="b3-menu__label">${state.language["no_doc"]}</span></button>`;
@@ -419,6 +460,16 @@ export function addLazyLoadEventListeners(menuElement: Element, maxDepth: number
 
             // 对子Menu再度绑定
             addLazyLoadEventListeners(submenuContainer, maxDepth, protyleElem, currentDepth + 1);
+
+            // 内容填充完成且子菜单正处于展开状态时重新定位：原生 showSubMenu 在
+            // hover 时基于“Loading...”占位（宽高为 0）定位，水平方向恒选右侧、
+            // 垂直方向可能贴底，填充后尺寸已变化，需按真实尺寸重新计算
+            if (menuItemElement.classList.contains('b3-menu__item--show')) {
+                const subMenuElement = menuItemElement.querySelector(':scope > .b3-menu__submenu') as HTMLElement;
+                if (subMenuElement) {
+                    window.siyuan.menus?.menu?.showSubMenu(subMenuElement);
+                }
+            }
         });
     });
 }
