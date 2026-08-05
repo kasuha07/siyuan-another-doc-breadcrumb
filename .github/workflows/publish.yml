@@ -16,7 +16,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Generate Package.zip
-        run: find . -not -path '*/\.*' -print | xargs zip package.zip
+        run: find . -not -path '*/\..*' -not -path './node_modules*' -not -path './scripts*' -print | xargs zip package.zip
 
 
       - name: Set up Python
