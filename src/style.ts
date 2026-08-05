@@ -284,6 +284,51 @@ export function setStyle() {
     content: "";
     margin-right: 0px;
 }
+
+/* ===== 同行模式：原生首项图标恢复“首项”样式 =====
+ * 插件内容带插入为 bar 的第一个子元素后，原生第一项不再是 :first-child，
+ * savor 等主题会按“非首项”规则给它套上背景色块（含 active 态）。
+ * 这里把紧随插件内容带的原生第一项图标恢复为思源默认 16px 无背景样式。 */
+.protyle-breadcrumb.og-fdb-inline-host
+    > .protyle-breadcrumb__bar
+    > .og-fdb-inline-breadcrumb
+    + .protyle-breadcrumb__item
+    > svg.popover__block {
+    height: 16px;
+    width: 16px;
+    padding: 0;
+    background-color: transparent !important;
+    color: var(--b3-theme-on-surface);
+}
+
+/* Savor 主题：复刻其“首项”规则（📄 emoji + 透明占位 svg），
+ * 保持与关闭同行模式时一致。官方集市版（royc01/notion-theme）
+ * 第一项图标实际是 ::before 上的 📄，svg 仅作透明占位。 */
+html[data-light-theme="Savor"] .protyle-breadcrumb.og-fdb-inline-host
+    > .protyle-breadcrumb__bar
+    > .og-fdb-inline-breadcrumb
+    + .protyle-breadcrumb__item::before,
+html[data-dark-theme="Savor"] .protyle-breadcrumb.og-fdb-inline-host
+    > .protyle-breadcrumb__bar
+    > .og-fdb-inline-breadcrumb
+    + .protyle-breadcrumb__item::before {
+    content: "📄";
+    margin-right: -14px;
+    font-size: 12px;
+}
+html[data-light-theme="Savor"] .protyle-breadcrumb.og-fdb-inline-host
+    > .protyle-breadcrumb__bar
+    > .og-fdb-inline-breadcrumb
+    + .protyle-breadcrumb__item
+    > svg.popover__block,
+html[data-dark-theme="Savor"] .protyle-breadcrumb.og-fdb-inline-host
+    > .protyle-breadcrumb__bar
+    > .og-fdb-inline-breadcrumb
+    + .protyle-breadcrumb__item
+    > svg.popover__block {
+    color: transparent;
+    background-color: transparent !important;
+}
     `;
     head.appendChild(style);
 }
