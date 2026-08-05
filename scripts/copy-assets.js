@@ -22,10 +22,12 @@ for (const f of files) {
     console.log(`OK: ${f}`);
 }
 
-// i18n 目录整体拷贝（思源要求 i18n/ 与 plugin.json 同目录）
+// i18n 目录整体拷贝（思源要求 i18n/ 与 plugin.json 同目录）；先清空目标保证无旧语言文件残留
 const i18nSrc = path.join(root, 'i18n');
 if (fs.existsSync(i18nSrc)) {
-    fs.cpSync(i18nSrc, path.join(dist, 'i18n'), { recursive: true });
+    const i18nDist = path.join(dist, 'i18n');
+    fs.rmSync(i18nDist, { recursive: true, force: true });
+    fs.cpSync(i18nSrc, i18nDist, { recursive: true });
     console.log('OK: i18n/');
 }
 
