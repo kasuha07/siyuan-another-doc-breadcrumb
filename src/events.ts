@@ -49,26 +49,28 @@ export function handleDestroyProtyle(detail: any) {
 }
 
 export async function eventBusHandler(detail: any) {
-    // console.log(detail);
-    const cmdType = ["moveDoc", "rename", "removeDoc", "filetreeSortChanged"];
-    if (cmdType.indexOf(detail.detail.cmd) != -1) {
-        try {
-            debugPush("检查刷新中（由重命名、移动或删除触发）");
+    // ws-main 为高频事件（输入时每次事务保存都会推送 savedoc），
+    // 必须先做 cmd 过滤，非目标消息直接返回，避免任何开销。
+    const cmd = detail?.detail?.cmd;
+    if (!["moveDoc", "rename", "removeDoc", "filetreeSortChanged"].includes(cmd)) {
+        return;
+    }
+    try {
+        debugPush("检查刷新中（由重命名、移动或删除触发）");
 
-            const allEditor = siyuan.getAllEditor();
-            const ids = getAllShowingDocId();
-            if (ids != null && ids.length > 0) {
-                for (let editor of allEditor) {
-                    if (ids.includes(editor.protyle.block.rootID)) {
-                        debugPush("由重命名、移动或删除触发");
-                        await main(editor.protyle);
-                    }
+        const allEditor = siyuan.getAllEditor();
+        const ids = getAllShowingDocId();
+        if (ids != null && ids.length > 0) {
+            for (let editor of allEditor) {
+                if (ids.includes(editor.protyle.block.rootID)) {
+                    debugPush("由重命名、移动或删除触发");
+                    await main(editor.protyle);
                 }
             }
-            state.g_adjacentDocCache = {};
-        } catch (err) {
-            errorPush(err);
         }
+        state.g_adjacentDocCache = {};
+    } catch (err) {
+        errorPush(err);
     }
 }
 

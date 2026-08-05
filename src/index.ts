@@ -160,7 +160,6 @@ export class FakeDocBreadcrumb extends Plugin {
                 { value: 0 },
                 { value: 1 },
                 { value: 2 }]),
-            new SettingProperty("immediatelyUpdate", "SWITCH", null),
             new SettingProperty("menuExtendSubDocDepth", "NUMBER", [1, 7]),
             new SettingProperty("showAdjacentDocButton", "SELECT", [
                 { value: CONSTANTS.ADJ_NONE },
@@ -183,12 +182,13 @@ export class FakeDocBreadcrumb extends Plugin {
      * 在这里启用eventBus事件监听，但请务必在offEventBusInnerHandler中设置对应的关闭
      */
     eventBusInnerHandler() {
+        // ws-main 始终监听：思源在文档重命名/移动后不会重渲染面包屑（见 protyle/index.ts
+        // 中 rename/moveDoc 分支），且不会触发 loaded-protyle-static，插件必须自行刷新；
+        // eventBusHandler 内部已按 cmd 过滤，非目标消息直接返回，无性能开销。
         this.eventBus.on("loaded-protyle-static", mainEventBusHander);
         this.eventBus.on("switch-protyle", mainEventBusHander);
         this.eventBus.on("destroy-protyle", handleDestroyProtyle);
-        if (state.g_setting.immediatelyUpdate) {
-            this.eventBus.on("ws-main", eventBusHandler);
-        }
+        this.eventBus.on("ws-main", eventBusHandler);
     }
 
     offEventBusInnerHander() {

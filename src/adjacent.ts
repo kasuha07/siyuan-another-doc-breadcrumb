@@ -207,7 +207,7 @@ export async function getNotebookAdjacentDocs(notebookId: string, cache: any = n
         debugPush("使用传入缓存", cacheKey);
         return cache[cacheKey].data;
     }
-    if (state.g_adjacentDocCache[cacheKey] && (Date.now() - state.g_adjacentDocCache[cacheKey].timestamp < 3 * 60 * 1000) && state.g_setting.immediatelyUpdate) {
+    if (state.g_adjacentDocCache[cacheKey] && (Date.now() - state.g_adjacentDocCache[cacheKey].timestamp < 3 * 60 * 1000)) {
         debugPush("使用笔记本文档缓存", cacheKey);
         return state.g_adjacentDocCache[cacheKey].data;
     }
@@ -237,7 +237,7 @@ export async function getAdjacentChildDocs(parentDoc: any, cache: any = null) {
         debugPush("使用传入缓存", cacheKey);
         return cache[cacheKey].data;
     }
-    if (cache == null && state.g_adjacentDocCache[cacheKey] && (Date.now() - state.g_adjacentDocCache[cacheKey].timestamp < 3 * 60 * 1000) && state.g_setting.immediatelyUpdate) {
+    if (cache == null && state.g_adjacentDocCache[cacheKey] && (Date.now() - state.g_adjacentDocCache[cacheKey].timestamp < 3 * 60 * 1000)) {
         debugPush("使用相邻文档缓存", cacheKey);
         return state.g_adjacentDocCache[cacheKey].data;
     }

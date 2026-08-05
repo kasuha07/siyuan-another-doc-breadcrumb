@@ -13,8 +13,6 @@
     "setting_foldedFrontShow_desp": "在文档层级过深时，将隐藏中间的部分文档。通过更改该设置，可以避免一些文档被隐藏。",
     "setting_foldedEndShow_name": "始终保留靠后的N个文档",
     "setting_foldedEndShow_desp": "",
-    "setting_immediatelyUpdate_name": "文档重命名、移动后立即更新",
-    "setting_immediatelyUpdate_desp": "由于一些原因，可能导致大量输入时卡顿等性能问题，如出现性能问题请关闭此选项并重启思源。另外，在涉及变动的笔记数量较多时，可能无法更新到最新结果。",
     "setting_allowFloatWindow_name": "允许悬停显示浮窗",
     "setting_allowFloatWindow_desp": "更改此项后，需要重新打开已经存在的文档页签。",
     "setting_usePluginArrow_name": "覆盖主题的面包屑分隔符\">\"样式",
