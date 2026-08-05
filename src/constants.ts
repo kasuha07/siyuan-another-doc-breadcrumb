@@ -45,7 +45,6 @@ export const g_setting_default = {
     "showRoot": false,
     "showAdjacentDocButton": CONSTANTS.ADJ_SAME_LEVEL,
     "adjacentNavStyle": CONSTANTS.ADJ_SHOW_TEXT,
-    "autoFixFocusError": false,
     "createDocBtnInMenu": true,
 };
 

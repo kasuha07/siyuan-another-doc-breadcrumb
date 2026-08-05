@@ -193,45 +193,6 @@ export function openRefLinkAgent(event: any, paramId = "", keyParam = undefined,
     });
 }
 
-export async function tryToFixAllError() {
-    if (!state.g_setting.autoFixFocusError) {
-        showMessage(state.language["autoFixEnableFirst"] + "--- fakeDocBreadcrumb");
-        return;
-    }
-    if (window.siyuan.dialogs.length == 1) {
-        window.siyuan.dialogs[0].destroy();
-    } else {
-        showMessage(state.language["closeOtherDialog"] + " --- fakeDocBreadcrumb");
-    }
-    if ((window as any)["OG_FDB_NO_WARNING"] == true) {
-        showMessage(state.language["onlyOneRunning"] + " --- fakeDocBreadcrumb");
-        return;
-    }
-    try {
-        (window as any)["OG_FDB_NO_WARNING"] = true;
-        showMessage(state.language["batchFixStart"] + "--- fakeDocBreadcrumb")
-        const list = window.siyuan.storage!["local-fileposition"];
-        if (list) {
-            for (let key in list) {
-                if (list.hasOwnProperty(key)) {
-                    if (list[key] && list[key]["zoomInId"] === key) {
-                        openRefLinkByAPI({
-                            paramDocId: key
-                        });
-                        await sleep(5000);
-                    }
-                }
-            }
-        }
-    } catch (err) {
-        errorPush(err);
-    } finally {
-        showMessage(state.language["batchFixEnd"] + "--- fakeDocBreadcrumb");
-        (window as any)["OG_FDB_NO_WARNING"] = false;
-    }
-
-}
-
 let lastClickTime_openRefLinkByAPI = 0;
 /**
  * 基于API的打开思源块/文档
