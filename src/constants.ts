@@ -44,7 +44,6 @@ export const g_setting_default = {
     "immediatelyUpdate": false, // 实时响应更新
     "allowFloatWindow": false, // 触发浮窗
     "usePluginArrow": true, // 使用挂件>箭头
-    "notOnlyOpenDocs": false, // 除了打开的文档之外，不再判断load-protyle调用来源，一律执行面包屑插入，可能带来不期待的后果
     "icon": 1,
     "menuKeepCurrentVisible": true,
     "menuExtendSubDocDepth": 2,

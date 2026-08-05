@@ -34,7 +34,7 @@ export async function mainEventBusHander(detail: any) {
     detail = detail.detail;
     const protyle = detail.protyle;
     // 部分情况下，进入文档会停留在默认的聚焦，这里先运行了看看情况
-    if (protyle.model == null && !state.g_setting.notOnlyOpenDocs /* || protyle.block.showAll */) {
+    if (protyle.model == null /* || protyle.block.showAll */) {
         infoPush("插件内嵌Protyle、浮窗~~或聚焦~~。停止操作。", protyle);
         return;
     }
