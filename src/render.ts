@@ -6,13 +6,19 @@ import { state } from "./state";
 import type { ActionRegistrar, BreadcrumbEntry } from "./types";
 import { emojiIconHandler, isNotebookDocEnabled } from "./utils";
 
-export function renderBreadcrumbFragment(entries: BreadcrumbEntry[], controller: ActionRegistrar) {
+export function renderBreadcrumbFragment(entries: BreadcrumbEntry[], controller: ActionRegistrar, inlineMode = false) {
     const fragment = document.createDocumentFragment();
 
     entries.forEach((entry, index) => {
         const item = createBreadcrumbItem(entry, controller);
         fragment.appendChild(item);
 
+        // 同行模式下最后一个 entry（当前文档）不渲染展开箭头：
+        // 其展开入口由紧随其后的原生块面包屑箭头承担，
+        // 避免与装饰分隔符相邻出现 “> ·” 的冗余显示。
+        if (index === entries.length - 1 && inlineMode) {
+            return;
+        }
         if (entry.hasChildren || index < entries.length - 1) {
             fragment.appendChild(createBreadcrumbArrow(entry, controller));
         }
@@ -75,19 +81,12 @@ export function createBreadcrumbArrow(entry: BreadcrumbEntry, controller: Action
 }
 
 /**
- * 装饰性分隔箭头（同行模式下内容带与原生内容带之间，无交互）
+ * 装饰性分隔符（同行模式下内容带与原生内容带之间，无交互）
  */
 export function createBreadcrumbDivider() {
     const span = document.createElement("span");
     span.className = "og-fdb-inline__divider";
     span.setAttribute("aria-hidden", "true");
-
-    const svgNS = "http://www.w3.org/2000/svg";
-    const svg = document.createElementNS(svgNS, "svg");
-    const use = document.createElementNS(svgNS, "use");
-    use.setAttributeNS("http://www.w3.org/1999/xlink", "xlink:href", "#iconRight");
-    svg.appendChild(use);
-    span.appendChild(svg);
 
     return span;
 }

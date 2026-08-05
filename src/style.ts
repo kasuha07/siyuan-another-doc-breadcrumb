@@ -60,9 +60,10 @@ export function setStyle() {
     /* 滚动由原生 bar 统一承担 */
     overflow: visible;
 
-    /* 与原生内容带的分隔由 JS 渲染为内容带末尾的装饰箭头
-     * .og-fdb-inline__divider，不再使用边框竖线 */
-    margin-inline-end: 6px;
+    /* 与原生内容带的分隔由 JS 渲染为内容带末尾的装饰圆点
+     * .og-fdb-inline__divider，不再使用边框竖线；
+     * 间距由 divider 与两侧 item 的自身 padding 提供（各 6px），
+     * 无需容器额外 margin，保证左右对称 */
 }
 
 /* 内容带内所有直接子项不得继续压缩（插件容器、原生路径项） */
@@ -168,11 +169,10 @@ export function setStyle() {
     width: 14px;
 }
 
-/* 内容带与原生内容带之间的装饰分隔箭头（同行模式，无交互） */
+/* 内容带与原生内容带之间的装饰分隔符（同行模式，无交互） */
 .og-fdb-inline__divider {
     align-items: center;
     align-self: center;
-    color: var(--b3-theme-on-surface-light);
     display: inline-flex;
     flex: 0 0 auto;
     height: 24px;
@@ -182,9 +182,12 @@ export function setStyle() {
     pointer-events: none;
     user-select: none;
 }
-.og-fdb-inline__divider > svg {
-    height: 14px;
-    width: 14px;
+.og-fdb-inline__divider::before {
+    background-color: var(--b3-theme-on-surface-light);
+    border-radius: 50%;
+    content: "";
+    height: 5px;
+    width: 5px;
 }
 .og-fdb-inline__arrow:hover {
     color: var(--b3-menu-highlight-color, var(--b3-theme-on-background));

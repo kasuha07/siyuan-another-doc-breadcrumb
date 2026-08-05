@@ -342,7 +342,7 @@ export class InlineBreadcrumbController {
         this.actions.clear();
         this.root = createInlineRoot();
         if (this.lastModel) {
-            this.root.appendChild(renderBreadcrumbFragment(this.lastModel.entries, this));
+            this.root.appendChild(renderBreadcrumbFragment(this.lastModel.entries, this, true));
             // 同行模式：内容带末尾追加与原生内容带之间的装饰分隔箭头
             if (this.nativeBar && this.lastModel.entries.length > 0) {
                 this.root.appendChild(createBreadcrumbDivider());
@@ -591,7 +591,7 @@ export class InlineBreadcrumbController {
         this.root.textContent = "";
         this.actions.clear();
 
-        this.root.appendChild(renderBreadcrumbFragment(model.entries, this));
+        this.root.appendChild(renderBreadcrumbFragment(model.entries, this, !!this.nativeBar));
 
         // 同行模式：内容带末尾追加与原生内容带之间的装饰分隔箭头
         if (this.nativeBar && model.entries.length > 0) {
