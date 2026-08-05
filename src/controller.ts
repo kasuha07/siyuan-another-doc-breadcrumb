@@ -23,7 +23,35 @@ import type { BreadcrumbModel, ControllerAction } from "./types";
  * 精确获取思源原生面包屑相关节点
  * 不使用模糊的 querySelector(".protyle-breadcrumb__bar") 猜测。
  */
+/**
+ * 把面包屑所在分屏（wnd）置为活动窗口。
+ *
+ * 背景：openTab → openFile 的目标窗口由 `.layout__wnd--active`（活动窗口）决定
+ * （app/src/editor/util.ts），而点击面包屑不会触发 setPanelFocus（思源只在
+ * wysiwyg focusin / tab 点击 / dock 点击时更新活动窗口），因此默认情况下
+ * openTab 可能把文档开进“最近激活”的另一个分屏，而非面包屑所在分屏。
+ * 此函数按思源 setPanelFocus 的取参方式（protyle.model.element.parentElement.parentElement）
+ * 定位 wnd，用 DOM 类与 activetime 模拟窗口激活，副作用最小。
+ */
+function activateProtyleWnd(protyle: any) {
+    const wndElement = protyle?.model?.element?.parentElement?.parentElement;
+    if (!(wndElement instanceof HTMLElement) || wndElement.getAttribute("data-type") !== "wnd") {
+        return;
+    }
+    document.querySelectorAll(".layout__wnd--active").forEach((element) => {
+        element.classList.remove("layout__wnd--active");
+    });
+    wndElement.classList.add("layout__wnd--active");
+    // openFile 在多个匹配 tab 中优先选择 data-activetime 最大的，刷新本分屏
+    // 当前 tab 的 activetime 保证“已打开文档”匹配时优先落回本分屏
+    const focusTab = wndElement.querySelector(".layout-tab-bar .item--focus");
+    if (focusTab instanceof HTMLElement) {
+        focusTab.setAttribute("data-activetime", String(Date.now()));
+    }
+}
+
 export function getNativeBreadcrumbParts(protyle: any) {
+
     const nativeBar = protyle?.breadcrumb?.element;
 
     if (!(nativeBar instanceof HTMLElement)) {
@@ -447,6 +475,13 @@ export class InlineBreadcrumbController {
     }
 
     dispatchAction(action: ControllerAction, target: Element, event: Event) {
+        if (state.g_setting.preferOpenInCurrentSplit) {
+            // 在面包屑所在分屏打开：先激活所在 wnd，openTab 才能落在正确分屏。
+            // 统一在入口处理，同时覆盖：路径项点击、> 子文档菜单/折叠菜单
+            // （菜单项点击走 openRefLinkByAPI，无分屏上下文，依赖此处预激活）、
+            // 上一篇/下一篇按钮。
+            activateProtyleWnd(this.protyle);
+        }
         switch (action.type) {
             case "open-document": {
                 const entry = action.entry;
