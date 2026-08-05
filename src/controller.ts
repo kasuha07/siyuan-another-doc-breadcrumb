@@ -383,12 +383,6 @@ export class InlineBreadcrumbController {
 
         event.preventDefault();
 
-        if (action.type === "open-document" && state.g_setting.swapClickFunction) {
-            // 交换左右键功能：左键显示下层文档菜单
-            this.dispatchAction({ type: "open-relative-menu", entry: action.entry }, target, event);
-            return;
-        }
-
         this.dispatchAction(action, target, event);
     }
 
@@ -412,13 +406,8 @@ export class InlineBreadcrumbController {
 
         event.preventDefault();
 
-        if (state.g_setting.swapClickFunction) {
-            // 交换左右键功能：右键打开文档
-            this.dispatchAction(action, target, event);
-        } else {
-            // 默认：右键显示下层文档菜单
-            this.dispatchAction({ type: "open-relative-menu", entry: action.entry }, target, event);
-        }
+        // 默认：右键显示下层文档菜单
+        this.dispatchAction({ type: "open-relative-menu", entry: action.entry }, target, event);
     }
 
     handleContextMenu(event: Event) {

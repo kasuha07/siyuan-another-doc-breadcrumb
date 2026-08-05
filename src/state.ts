@@ -43,7 +43,6 @@ export const state: StateShape = {
         "icon": null,
         "menuKeepCurrentVisible": null,
         "menuExtendSubDocDepth": null,
-        "swapClickFunction": null,
         "showRoot": null,
         "showAdjacentDocButton": null,
         "createDocBtnInMenu": null,

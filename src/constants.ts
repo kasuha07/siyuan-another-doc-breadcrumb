@@ -49,7 +49,6 @@ export const g_setting_default = {
     "icon": 1,
     "menuKeepCurrentVisible": true,
     "menuExtendSubDocDepth": 2,
-    "swapClickFunction": false,
     "showRoot": false,
     "showAdjacentDocButton": CONSTANTS.ADJ_SAME_LEVEL,
     "adjacentNavStyle": CONSTANTS.ADJ_SHOW_TEXT,

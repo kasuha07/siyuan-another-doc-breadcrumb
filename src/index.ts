@@ -169,7 +169,6 @@ export class FakeDocBreadcrumb extends Plugin {
                 { value: 2 }]),
             new SettingProperty("immediatelyUpdate", "SWITCH", null),
             new SettingProperty("menuExtendSubDocDepth", "NUMBER", [1, 7]),
-            new SettingProperty("swapClickFunction", "SWITCH", null),
             new SettingProperty("showAdjacentDocButton", "SELECT", [
                 { value: CONSTANTS.ADJ_NONE },
                 { value: CONSTANTS.ADJ_SAME_PARENT },
