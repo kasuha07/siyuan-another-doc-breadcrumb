@@ -147,7 +147,6 @@ export class FakeDocBreadcrumb extends Plugin {
         const settingForm = document.createElement("form");
         settingForm.setAttribute("name", CONSTANTS.PLUGIN_NAME);
         settingForm.appendChild(generateSettingPanel([
-            new SettingProperty("RESERVE_HINT", "HINT", null),
             new SettingProperty("docMaxNum", "NUMBER", [0, 1024]),
             new SettingProperty("nameMaxLength", "NUMBER", [0, 1024]),
             new SettingProperty("showNotebook", "SWITCH", null),
