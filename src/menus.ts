@@ -31,6 +31,15 @@ export function openHideMenu({ anchorElement, hiddenEntries }: any, event: any) 
     let rect = anchorElement.getBoundingClientRect();
     event.stopPropagation();
     event.preventDefault();
+    // 清理相对菜单的加载中占位：占位期间 removeCB 尚未注册，closeCB 不会触发，
+    // 若不清理，相对菜单 await 完成后会凭 id 校验通过并把本菜单顶掉
+    state.g_relativeMenu = null;
+    // SDK Menu 构造时若 data-name 与传入 id 相同会进入 isOpen 静默失败态
+    // （addItem/open 全部无效），同名菜单已打开时主动关闭，避免“再点一次菜单消失”
+    if (document.querySelector("#commonMenu[data-name='newMenu']")) {
+        window.siyuan.menus?.menu?.close();
+        return;
+    }
     const tempMenu = new Menu("newMenu");
     for (let i = 0; i < hiddenEntries.length; i++) {
         let id = hiddenEntries[i].id;
@@ -82,6 +91,13 @@ export function checkAndCloseLastMenu(id: string) {
 }
 
 /**
+ * 子文档列表懒加载缓存（仅当前菜单生命周期内有效）：
+ * 同一菜单内 hover 移开再移回不再重复请求；菜单关闭（menuCloseCB）时清空，
+ * 重新打开菜单时保证数据新鲜。
+ */
+const submenuCache = new Map<string, any[]>();
+
+/**
  * 菜单打开前的统一守卫：
  * - 同一菜单正在加载中（占位 menu 为 null）时忽略重复触发（连点/双击），
  *   避免“先 await 完成者打开菜单、后完成者的 checkAndCloseLastMenu 又把刚打开的菜单关闭”；
@@ -102,6 +118,7 @@ export function guardMenuOpen(id: string): boolean {
  */
 export function menuCloseCB() {
     state.g_relativeMenu = null;
+    submenuCache.clear();
 }
 export function saveLastMenu(menuObj: any, id: string) {
     state.g_relativeMenu = { "menu": menuObj, "id": id };
@@ -288,8 +305,8 @@ export function addLazyLoadEventListeners(menuElement: Element, maxDepth: number
         const menuItemElement = item.closest('.b3-menu__item');
         if (!menuItemElement) return;
 
-        // 悬停加载
-        menuItemElement.addEventListener('mouseover', async function handleMouseOver(e) {
+        // 统一的懒加载逻辑：鼠标悬停与键盘展开（--show 类变化）共用
+        const loadSubmenu = async () => {
             const docId = item.getAttribute('data-doc-id')!;
             const path = item.getAttribute('data-path')!;
             const box = item.getAttribute('data-box')!;
@@ -306,18 +323,25 @@ export function addLazyLoadEventListeners(menuElement: Element, maxDepth: number
             submenuContainer.innerHTML = '';
 
             let childDocuments: any[];
-            try {
-                // 加载子文档
-                const sqlResult = [{ path, box }];
-                childDocuments = await getChildDocuments(docId, sqlResult);
-            } catch (err) {
-                // 加载失败（网络/kernel 错误、文档已删除等）：重置标记允许移开鼠标后重试，并给出可见提示
-                errorPush(err);
-                item.setAttribute('data-loaded', 'false');
-                if (menuItemElement.isConnected) {
-                    submenuContainer.innerHTML = `<button class="b3-menu__item" disabled><span class="b3-menu__label">${state.language["loadFailed"] ?? state.language["no_doc"]}</span></button>`;
+            const cacheKey = `${box}|${path}`;
+            const cached = submenuCache.get(cacheKey);
+            if (cached) {
+                childDocuments = cached;
+            } else {
+                try {
+                    // 加载子文档
+                    const sqlResult = [{ path, box }];
+                    childDocuments = await getChildDocuments(docId, sqlResult);
+                    submenuCache.set(cacheKey, childDocuments);
+                } catch (err) {
+                    // 加载失败（网络/kernel 错误、文档已删除等）：重置标记允许移开鼠标后重试，并给出可见提示
+                    errorPush(err);
+                    item.setAttribute('data-loaded', 'false');
+                    if (menuItemElement.isConnected) {
+                        submenuContainer.innerHTML = `<button class="b3-menu__item" disabled><span class="b3-menu__label">${state.language["loadFailed"] ?? state.language["no_doc"]}</span></button>`;
+                    }
+                    return;
                 }
-                return;
             }
 
             // 加载期间菜单已被关闭（#commonMenu 被其他菜单复用，内容已清空），放弃填充
@@ -470,6 +494,17 @@ export function addLazyLoadEventListeners(menuElement: Element, maxDepth: number
                     window.siyuan.menus?.menu?.showSubMenu(subMenuElement);
                 }
             }
+        };
+
+        // 鼠标悬停触发懒加载
+        menuItemElement.addEventListener('mouseover', loadSubmenu);
+        // 键盘展开：原生 bindMenuKeydown 的 →/Enter 只添加 b3-menu__item--show 类并调用
+        // showSubMenu，不派发 mouseover；监听类变化以覆盖键盘路径（data-loaded 标记去重）
+        const showObserver = new MutationObserver(() => {
+            if (menuItemElement.classList.contains('b3-menu__item--show')) {
+                loadSubmenu();
+            }
         });
+        showObserver.observe(menuItemElement, { attributes: true, attributeFilter: ['class'] });
     });
 }
