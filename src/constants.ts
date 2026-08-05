@@ -41,7 +41,6 @@ export const g_setting_default = {
     "oneLineBreadcrumb": true,
     "usePluginArrow": true, // 使用挂件>箭头
     "icon": 1,
-    "menuKeepCurrentVisible": true,
     "menuExtendSubDocDepth": 2,
     "showRoot": false,
     "showAdjacentDocButton": CONSTANTS.ADJ_SAME_LEVEL,

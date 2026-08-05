@@ -22,8 +22,6 @@
     "setting_icon_option_0": "Hide all",
     "setting_icon_option_1": "Custom + default",
     "setting_icon_option_2": "Show all",
-    "setting_menuKeepCurrentVisible_name": "Subdocument menu: scroll to current path when menu is expanded",
-    "setting_menuKeepCurrentVisible_desp": "When enabled, the subdocument menu automatically scrolls to ensure that the path of the current document can be displayed; except when the maximum number of documents is set to be small and is not listed;",
     "setting_menuExtendSubDocDepth_name": "Sub-doc Menu Extend Depth",
     "setting_menuExtendSubDocDepth_desp": "Maximum number of nested levels to recursively expand sub-document menus. A value of 1 shows only direct children without expanding their sub-menus. Valid range: 1–7.",
     "setting_showAdjacentDocButton_name": "Show previous/next document buttons",

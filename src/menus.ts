@@ -274,14 +274,6 @@ export async function openRelativeMenu({ protyle, anchorElement, parentId, nextI
         tempMenu.open({ x: rect.left, y: rect.bottom, isLeft: false });
     }
     setTimeout(() => {
-        if (state.g_setting.menuKeepCurrentVisible) {
-            tempMenu.element.querySelector('.b3-menu__item--selected')?.scrollIntoView({
-                behavior: 'smooth',
-                block: 'nearest',
-                inline: 'nearest'
-            });
-        }
-
         // 懒加载
         if (state.g_setting.menuExtendSubDocDepth > 1) {
             addLazyLoadEventListeners(tempMenu.element, maxDepth, protyle.element);
