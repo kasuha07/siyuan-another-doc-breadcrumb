@@ -316,8 +316,18 @@ export function openRefLinkByAPI({ mouseEvent, paramDocId = "", keyParam = {}, o
     // 后台打开页签不可移除。用 afterOpen 回调关闭旧页签：openTab 内部先异步
     // 获取块信息再创建新页签，若提前同步关闭旧页签，分屏仅剩一个页签时
     // 会触发思源销毁整个分屏（layout/Wnd.ts removeTabAction），破坏布局。
+    // 目标文档已打开时（isDocAlreadyOpen 为 true），思源 openFile 走
+    // switchEditor/getUnInitTab 分支：不创建新页签且同步调用 afterOpen，此时
+    // 移除当前页签会在其所在分屏仅剩一个页签时销毁整个分屏（Wnd.ts
+    // children.length===1 分支）；且该场景下思源官方本就忽略 removeCurrentTab，
+    // 这里同样跳过移除，仅切换页签。
+    const docAlreadyOpen = isDocAlreadyOpen(docId);
     if (removeCurrentTab && !isEventCtrlKey(keyParam)) {
         finalParam.afterOpen = () => {
+            if (docAlreadyOpen) {
+                debugPush("目标文档已打开（switchEditor 分支），跳过移除当前页签");
+                return;
+            }
             debugPush("插件自行移除页签");
             removeCurrentTabF(needToCloseDocId);
         };
@@ -374,6 +384,47 @@ export function removeCurrentTabF(docId: string | null) {
         return;
     }
 
+}
+
+/**
+ * 目标文档是否已打开（含未初始化页签）。
+ *
+ * 匹配逻辑对齐思源 openFile（app/src/editor/util.ts）：已初始化页签按
+ * protyle.block.rootID 匹配；未初始化页签解析 headElement 的 data-initdata，
+ * 按 rootId/blockId 二字段匹配（getUnInitTab 同款判断）。
+ * 注意：docId 为文档 id 时可靠；若为文档内块 id 且该文档已打开，rootID 与
+ * blockId 均不匹配会漏检（仅退回不跳过移除的旧行为，不产生新问题）。
+ */
+function isDocAlreadyOpen(docId: string | undefined) {
+    if (!isValidStr(docId)) {
+        return false;
+    }
+    if (siyuan?.getAllEditor) {
+        const editors = siyuan.getAllEditor();
+        for (const editor of editors) {
+            if (editor.protyle?.block?.rootID === docId) {
+                return true;
+            }
+        }
+    }
+    if (siyuan?.getAllTabs) {
+        const tabs = siyuan.getAllTabs();
+        for (const tab of tabs) {
+            const initData = tab.headElement?.getAttribute("data-initdata");
+            if (!initData) {
+                continue;
+            }
+            try {
+                const initObj = JSON.parse(initData);
+                if (initObj?.instance === "Editor" && (initObj.rootId === docId || initObj.blockId === docId)) {
+                    return true;
+                }
+            } catch (e) {
+                debugPush("解析页签 data-initdata 失败", e);
+            }
+        }
+    }
+    return false;
 }
 
 export async function fillNotebookDocFileInfo(notebookList: any[]) {
