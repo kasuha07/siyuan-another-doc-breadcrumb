@@ -32,13 +32,22 @@
 
 ## Differences from upstream
 
-This fork diverges from upstream `syplugin-fakeDocBreadcrumb` in the following ways:
+This fork diverges from upstream `syplugin-fakeDocBreadcrumb` (v1.5.1; upstream is now in maintenance mode with no new features) in the following ways:
 
 - **Refactoring**: Rewritten in TypeScript with strict type checking; built with esbuild as a single-file bundle; `dist/` is the only plugin directory.
-- **Removed settings/features**: "Automatically fix focus errors", "Scroll to current path when expanding menu", "Hover tooltip", "Update immediately after rename/move", "Show in more cases", "Hide while typing", "Scroll hint", "Swap left/right click actions", "Allow hover popup".
-- **Promoted to stable**: "Open in the split-screen area of the breadcrumb", "Extended sub-document menu levels", "Create document button in menu".
-- **New settings**: Previous/next button style options; "Open previous/next in the current tab" (disabled by default).
-- **Other**: The separator between plugins and the native content strip in one-line mode uses CSS dots; removed the external debug protocol (`OpaqueGlassDebugV2`) dependency.
+- **Default value changes**: "Display the document breadcrumb on the same line as the block breadcrumb" and "Show new document button in the menu" are enabled by default (disabled upstream); "Open in the split-screen area of the breadcrumb" is always on with no switch (an experimental toggle, default-on upstream).
+- **Removed settings/features**:
+  - "Automatically fix focus errors" (a hidden upstream setting; the fix has been stable in production, so the switch is gone);
+  - "Scroll to current path when expanding menu" (a hidden upstream setting);
+  - "Allow hover popup" (incomplete upstream implementation);
+  - "Update immediately after rename/move" (this plugin always updates immediately; upstream defaults to off and requires manual enabling);
+  - "Show in more cases", "Hide while typing", "Swap left/right click actions", and the "Scroll hint" (scroll for more settings) hint item.
+- **Promoted to stable**: "Open in the split-screen area of the breadcrumb", "Extended sub-document menu levels" (up to 7), "Create document button in menu" (on by default).
+- **New settings**: Previous/next button style options (text / arrow only); "Open previous/next in the current tab" (disabled by default).
+- **Stability & performance**: lazy submenu loading via container-level event delegation (upstream uses one MutationObserver per item); breadcrumb collapsing via binary search (reflow O(n) → O(log n)); document structure changes batched into one refresh per 100 ms window, eliminating request bursts on bulk moves; deduplicated open-document events; batch `getDocsInfo` instead of per-level lookups; init retries (up to 5) with fallback to default settings; unified fetch error handling with null fallbacks.
+- **Security**: document names and icons are escaped before being inserted into menu HTML (two XSS vectors closed).
+- **Lifecycle**: full cleanup on `destroy-protyle` — no leftover nodes after unload; settings saves rebuild only what changed; styles are injected via the official `pluginsStyle` mechanism and removed automatically on unload.
+- **Other**: The separator between the plugin and the native content strip in one-line mode uses CSS dots; removed the external debug protocol (`OpaqueGlassDebugV2`) dependency; three undocumented SiYuan dependencies (tab-close chain, outline API fields, encrypted-notebook `closed` semantics) verified against the v3.7.3 source and documented.
 
 ## Feedback bugs
 
