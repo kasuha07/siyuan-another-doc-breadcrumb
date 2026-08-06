@@ -159,6 +159,10 @@ export class InlineBreadcrumbController {
     documentId = "";
     lastRenderedDocId = "";
     lastModel: BreadcrumbModel | null = null;
+    /** 最近一次 render 的内容带 DOM 快照：思源重写 bar 后 MO 恢复直接复用，避免全量重建 */
+    cachedRoot: HTMLElement | null = null;
+    /** 最近一次 render 的模型指纹（JSON 序列化）：内容未变时跳过重复重建 */
+    lastFingerprint: string | null = null;
     contentObserver: MutationObserver | null = null;
     resizeObserver: ResizeObserver | null = null;
     root: HTMLElement | null = null;
@@ -329,6 +333,10 @@ export class InlineBreadcrumbController {
     /**
      * 把插件内容容器恢复到原生 bar 头部，并保持“当前块”的可视位置。
      * 恢复插入本身会再次触发 observer，contains 检查保证不重复插入。
+     *
+     * 性能：插件内容只取决于文档路径（与光标位置无关），每次移块重写后
+     * 产物与上次完全一致，直接复用 render 时保存的 DOM 快照，
+     * 跳过按钮重建、action 重注册与相邻导航重建。
      */
     restoreInlineRoot() {
         if (!this.nativeBar || !this.nativeBar.isConnected) {
@@ -341,20 +349,26 @@ export class InlineBreadcrumbController {
         const oldScrollWidth = this.nativeBar.scrollWidth;
         const oldScrollLeft = this.nativeBar.scrollLeft;
 
-        this.actions.clear();
-        this.root = createInlineRoot();
-        if (this.lastModel) {
-            this.root.appendChild(renderBreadcrumbFragment(this.lastModel.entries, this, true));
-            // 同行模式：内容带末尾追加与原生内容带之间的装饰分隔箭头
-            if (this.nativeBar && this.lastModel.entries.length > 0) {
-                this.root.appendChild(createBreadcrumbDivider());
+        if (this.cachedRoot) {
+            this.root = this.cachedRoot;
+            this.nativeBar.insertBefore(this.root, this.nativeBar.firstElementChild);
+        } else {
+            this.actions.clear();
+            this.root = createInlineRoot();
+            if (this.lastModel) {
+                this.root.appendChild(renderBreadcrumbFragment(this.lastModel.entries, this, true));
+                // 同行模式：内容带末尾追加与原生内容带之间的装饰分隔箭头
+                if (this.nativeBar && this.lastModel.entries.length > 0) {
+                    this.root.appendChild(createBreadcrumbDivider());
+                }
             }
+            this.nativeBar.insertBefore(this.root, this.nativeBar.firstElementChild);
+            // 相邻导航不参与 bar 重写，但需重建以同步 action registry
+            this.syncAdjacentNav();
         }
-        this.nativeBar.insertBefore(this.root, this.nativeBar.firstElementChild);
-        // 相邻导航不参与 bar 重写，但需重建以同步 action registry
-        this.syncAdjacentNav();
 
-        // 同行模式：空间不足时恢复思源原生省略机制（先压缩再计算宽度补偿）
+        // 同行模式：空间不足时恢复思源原生省略机制
+        // （原生块面包屑每次移块都会变化，省略状态必须重算）
         if (this.nativeBar) {
             applyBreadcrumbEllipsis(this.nativeBar);
         }
@@ -575,6 +589,15 @@ export class InlineBreadcrumbController {
     render(model: BreadcrumbModel) {
         this.lastModel = model;
 
+        // 内容指纹未变（典型：光标移块触发的重复刷新，模型与上次完全一致）：
+        // 跳过整轮 DOM 重建与省略重算；若 root 已被思源重写清掉，
+        // 由 MutationObserver 恢复路径用 cachedRoot 快照兜底。
+        const fingerprint = JSON.stringify(model);
+        if (fingerprint === this.lastFingerprint) {
+            return;
+        }
+        this.lastFingerprint = fingerprint;
+
         // 同行模式：整体滚动容器是原生 bar；两行模式：插件根节点
         const scroller = this.nativeBar ?? this.root;
         const scrollState = captureScrollState(scroller as HTMLElement);
@@ -612,6 +635,10 @@ export class InlineBreadcrumbController {
             applyBreadcrumbEllipsis(this.nativeBar);
         }
 
+        // 快照内容带 DOM：思源重写 bar 后 MO 恢复直接复用
+        // （内容只取决于文档路径，与光标位置无关）
+        this.cachedRoot = this.root.cloneNode(true) as HTMLElement;
+
         // 首次渲染或文档切换：滚到最右端；同文档刷新：保留原位置
         restoreScrollState(scroller as HTMLElement, scrollState, forceEnd);
     }
@@ -626,6 +653,8 @@ export class InlineBreadcrumbController {
         this.root?.remove();
         this.wrapper?.remove();
         this.adjacentNav?.remove();
+        this.cachedRoot = null;
+        this.lastFingerprint = null;
 
         if (this.host?.isConnected) {
             this.host.classList.remove(CONSTANTS.HOST_STATE_CLASS_NAME);
