@@ -11,6 +11,18 @@ import { getDocOutline } from "./api";
 import { escapeHTML, getPluginInstance, stripHTML } from "./utils";
 import { guardMenuOpen, menuCloseCB, saveLastMenu } from "./menus";
 
+/**
+ * 取大纲项的下一级子标题列表。
+ * getDocOutline 返回 []*Path（kernel/model/outline.go，v3.7.3），每项的下一级子标题
+ * 存于 blocks 字段（[]*Block，kernel/model/block.go Path 结构 json:"blocks,omitempty"）；
+ * children 字段（[]*Path，子路径节点）在同结构中存在，但 outline 响应中恒为空（未赋值）。
+ * 两字段名均未在 API 文档中声明，双字段容错源自上游插件对历史版本的兼容；
+ * 若升级后字段改名/结构调整，此处返回 []，上层表现为菜单为空并提示“无内容”，不会抛错。
+ */
+function getOutlineChildren(item: any): any[] {
+    return item?.blocks || item?.children || [];
+}
+
 export async function addBlockBdMenuListener(protyle: any) {
     // 限制范围，避免影响插件插入的面包屑
     const breadcrumbBar = protyle?.breadcrumb?.element;
@@ -90,15 +102,14 @@ export async function addBlockBdMenuListener(protyle: any) {
                         if (item.id === targetId) {
                             return item;
                         }
-                        // 顶层标题
-                        if (item.blocks && item.blocks.length > 0) {
-                            const found = findHeadingById(item.blocks, targetId);
-                            if (found) return found;
-                        }
-                        // 深层标题
-                        if (item.children && item.children.length > 0) {
-                            const found = findHeadingById(item.children, targetId);
-                            if (found) return found;
+                        // 顶层标题 / 深层标题：blocks 与 children 双字段都搜索（blocks 优先），
+                        // 字段语义见 getOutlineChildren 注释
+                        const childLists = [item.blocks, item.children];
+                        for (const children of childLists) {
+                            if (Array.isArray(children) && children.length > 0) {
+                                const found = findHeadingById(children, targetId);
+                                if (found) return found;
+                            }
                         }
                     }
                     return null;
@@ -107,7 +118,7 @@ export async function addBlockBdMenuListener(protyle: any) {
                 const parentHeading = findHeadingById(outlineData, nodeId);
                 if (parentHeading) {
                     // 优先使用 blocks，如果没有则使用 children
-                    menuItems = parentHeading.blocks || parentHeading.children || [];
+                    menuItems = getOutlineChildren(parentHeading);
                 } else {
                     logPush(`标题 ${nodeId} 没有找到或没有子标题。`);
                 }
@@ -153,8 +164,8 @@ export async function addBlockBdMenuListener(protyle: any) {
                         }
                     };
 
-                    const childItems = item.blocks || item.children;
-                    if (childItems && childItems.length > 0) {
+                    const childItems = getOutlineChildren(item);
+                    if (childItems.length > 0) {
                         menuItem.type = "submenu";
                         menuItem.submenu = buildMenuItems(childItems);
                     }

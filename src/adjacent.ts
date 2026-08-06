@@ -212,6 +212,7 @@ export async function getNotebookAdjacentDocs(notebookId: string, cache: any = n
         return state.g_adjacentDocCache[cacheKey].data;
     }
     const notebookList = await getNodebookList() ?? [];
+    // closed == false：排除未挂载笔记本（含锁定中的加密笔记本，语义见 api.getNodebookList 注释）
     const result = notebookList.filter((notebook: any) => notebook.closed == false);
     // 面包屑情况下不太需要详细信息，这里先不调用信息补全了
     // await fillNotebookDocFileInfo(notebookList.filter(notebook=>notebook.closed==false));

@@ -1,5 +1,12 @@
 ## 更新日志
 
+### 未发布
+
+- 加固：对照思源 v3.7.3 源码逐项验证插件依赖的 DOM 结构 / API 语义假设（全部成立），并文档化三处未文档化依赖，降低思源升级导致的静默失效风险：
+  - 页签关闭链 `protyle.model.parent.parent.removeTab`（Model→Tab→Wnd，布局内部链）：增加存在性检查，链断裂时在日志中告警而非静默（失效表现为页签不关闭的软失效）；
+  - `getDocOutline` 返回项的 `blocks`/`children` 双字段（v3.7.3 中仅 `blocks` 有值，`children` 恒为空）：集中为 `getOutlineChildren()` 并注释字段语义与失效表现；
+  - 加密笔记本隐式处理（`closed` 字段语义 = 未挂载/锁定、内核按 blockID 查询时遍历已解锁加密笔记本的兑底）：注释说明；`getChildDocuments` 对 `listDocsByPath` 返回 null 时直接返回空数组，不再抛出误导性 TypeError。
+
 ### v1.0.2 (2026年8月6日)
 
 - 修复：关闭“在文档菜单中显示新建文档按钮”后，后续层级（懒加载子菜单）文档菜单仍显示新建文档按钮；现在该设置对所有层级的文档菜单生效；

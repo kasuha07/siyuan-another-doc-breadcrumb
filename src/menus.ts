@@ -167,6 +167,7 @@ export async function openRelativeMenu({ protyle, anchorElement, parentId, nextI
             }];
             siblings = await getChildDocuments(id, sqlResult);
         } else {
+            // closed == false：排除未挂载笔记本（含锁定中的加密笔记本，语义见 api.getNodebookList 注释）
             siblings = window.siyuan.notebooks!.filter(item => item.closed == false);
         }
     } catch (err) {

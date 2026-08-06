@@ -20,6 +20,11 @@ export function getNotebooks() {
 }
 
 export async function getNodebookList() {
+    // lsNotebooks 返回全部笔记本（含已关闭的）；closed==true 表示笔记本未挂载，
+    // 加密笔记本锁定（DEK 不在内存）时亦被内核强制标记为 closed
+    // （kernel/model/conf.go 启动时统一标记，v3.7.3）。
+    // 调用方以 filter(closed == false) 隐式排除锁定中的加密笔记本，未显式使用
+    // Box.encrypted/unlocked 字段（较新版本才存在，不宜依赖）。
     let url = "/api/notebook/lsNotebooks";
     let response = await postRequest({}, url);
     if (response.code == 0 && response.data != null && "notebooks" in response.data) {
@@ -73,6 +78,12 @@ export async function getNotebookInfo(notebookId: string) {
 
 export async function getChildDocuments(docId: string, sqlResult: any[]) {
     let childDocs = await listDocsByPath({ path: sqlResult[0].path, notebook: sqlResult[0].box });
+    if (!childDocs) {
+        // listDocsByPath 对未挂载（closed，含锁定中的加密笔记本）返回 code!=0 → null，
+        // 直接返回空数组而非抛 TypeError（原实现会解引用 null 由调用方 catch，报错信息误导）；
+        // 调用方（菜单懒加载）已有加载失败提示与重试逻辑，此处静默降级为“无子文档”。
+        return [];
+    }
     if (childDocs.files.length > state.g_setting.docMaxNum && state.g_setting.docMaxNum != 0) {
         childDocs.files = childDocs.files.slice(0, state.g_setting.docMaxNum);
     }
@@ -154,6 +165,10 @@ export async function getDocOutline(docId: string) {
 }
 
 export async function getDocInfo(docId: string) {
+    // 未传 notebook 参数：内核先在全局 db 按 blockID 查询，未命中时隐式遍历所有
+    // 已解锁加密笔记本兜底（kernel/model/tree.go loadTreeByBlockIDInBox，v3.7.3），
+    // 故对已解锁加密笔记本文档也能取到 icon/subFileCount；锁定（closed）笔记本则
+    // 返回 code!=0 → parseBody 为 null，由调用方逐点降级。该兜底未在 API 文档声明。
     let url = `/api/block/getDocInfo`;
     return parseBody(request(url, { id: docId }));
 }
@@ -307,9 +322,20 @@ export function removeCurrentTabF(docId: string | null) {
                     return;
                 }
             }
-            //id: string, closeAll = false, animate = true, isSaveLayout = true
-            debugPush("关闭存在页签", protyle?.model?.parent?.parent, protyle.model?.parent?.id);
-            protyle?.model?.parent?.parent?.removeTab(protyle.model?.parent?.id, false, false);
+            // 未文档化的布局内部链：protyle.model.parent = Tab（页签）、Tab.parent = Wnd（页签容器），
+            // Wnd.removeTab(id, isBatchClose=false, animate=false, isSaveLayout=true) 为布局公开方法
+            // （app/src/layout/Wnd.ts v3.7.3；SDK 类型声明 layout/Model.d.ts、Tab.d.ts、Wnd.d.ts 可见，
+            // 但 API 文档未说明此用法）。思源自身同款写法：item.parent.parent.removeTab(item.parent.id)
+            // （app/src/layout/dock/util.ts）。移动端 model.parent 为 null，但移动端入口已提前返回。
+            // 若升级后此链断裂，仅表现为“页签不关闭”的软失效；此处做存在性检查并告警，避免静默。
+            const tabContainer = protyle?.model?.parent?.parent;
+            const tabId = protyle.model?.parent?.id;
+            if (typeof tabContainer?.removeTab !== "function" || !tabId) {
+                warnPush("移除页签链失效：model.parent.parent.removeTab 不可用，跳过关闭（思源可能移除了该内部结构）");
+                return;
+            }
+            debugPush("关闭存在页签", tabContainer, tabId);
+            tabContainer.removeTab(tabId, false, false);
         } else {
             debugPush("没有找到对应的protyle，不关闭存在的页签");
             return;
