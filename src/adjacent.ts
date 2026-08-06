@@ -159,7 +159,6 @@ export async function getAdjacentDocs(pathObjects: PathObject[], notebookDocFlag
     }
     const currentDoc = pathObjects[pathObjects.length - 1];
     const previousDoc = pathObjects[pathObjects.length - 2];
-    const currentDepth = pathObjects.length - 1;
     let sameLevelDocs: any = null;
     if (notebookDocFlag) {
         sameLevelDocs = await getNotebookAdjacentDocs(currentDoc.box);
@@ -177,16 +176,21 @@ export async function getAdjacentDocs(pathObjects: PathObject[], notebookDocFlag
         && (!result.previousDoc || !result.nextDoc) && !notebookDocFlag
     ) {
         debugPush("当前文档同级没有足够的文档，尝试向上获取同层级文档");
+        // 定向查找：只沿祖先链向上、在命中方向的兄弟子树中下钻，替代旧实现从
+        // 笔记本根 DFS 全量枚举（整棵子树每个有子文档节点一次 listDocsByPath，
+        // 深度 4、每层 20 文档即约 8400 次串行请求）；两个方向子树互不相交，并行拉取
         const cache: any = {};
-        const sameLevelDocs = await getAdjacentDocsByDepth(pathObjects[0], currentDepth, cache);
-        const currentIndex = findAdjacentDocIndex(sameLevelDocs, currentDoc.id);
-        if (result.previousDoc == null && currentIndex > 0) {
+        const [previousDoc, nextDoc] = await Promise.all([
+            result.previousDoc == null ? findAdjacentSameLevelDoc(pathObjects, "previous", cache) : Promise.resolve(null),
+            result.nextDoc == null ? findAdjacentSameLevelDoc(pathObjects, "next", cache) : Promise.resolve(null),
+        ]);
+        if (previousDoc) {
             result.sameLevelPrevious = true;
-            result.previousDoc = sameLevelDocs[currentIndex - 1] ?? null;
+            result.previousDoc = previousDoc;
         }
-        if (result.nextDoc == null && currentIndex < sameLevelDocs.length - 1) {
+        if (nextDoc) {
             result.sameLevelNext = true;
-            result.nextDoc = sameLevelDocs[currentIndex + 1] ?? null;
+            result.nextDoc = nextDoc;
         }
     }
     return result;
@@ -234,13 +238,16 @@ export async function getAdjacentChildDocs(parentDoc: any, cache: any = null) {
         return [];
     }
     const cacheKey = `${parentDoc.box}-${parentDoc.path}`;
+    // 全局 3 分钟缓存始终优先：旧实现当传入局部 cache（递归遍历）时跳过全局
+    // 缓存判断，遍历中的每个节点都真实发请求，且重复导航无法复用已取数据
+    const globalCached = state.g_adjacentDocCache[cacheKey];
+    if (globalCached && (Date.now() - globalCached.timestamp < 3 * 60 * 1000)) {
+        debugPush("使用相邻文档缓存", cacheKey);
+        return globalCached.data;
+    }
     if (cache && cache[cacheKey]) {
         debugPush("使用传入缓存", cacheKey);
         return cache[cacheKey].data;
-    }
-    if (cache == null && state.g_adjacentDocCache[cacheKey] && (Date.now() - state.g_adjacentDocCache[cacheKey].timestamp < 3 * 60 * 1000)) {
-        debugPush("使用相邻文档缓存", cacheKey);
-        return state.g_adjacentDocCache[cacheKey].data;
     }
     const response = await listDocsByPath({
         path: parentDoc.path,
@@ -264,23 +271,76 @@ export async function getAdjacentChildDocs(parentDoc: any, cache: any = null) {
     return state.g_adjacentDocCache[cacheKey].data;
 }
 
-export async function getAdjacentDocsByDepth(parentDoc: any, targetDepth: number, cache: any) {
-    if (targetDepth <= 0) {
-        return [];
+/**
+ * 同层相邻文档兜底查找：当前文档是父目录首/尾子文档时，向上逐层检查各祖先的
+ * 相邻兄弟子树，定向取最前（next）/最后（previous）的目标深度文档。
+ *
+ * 与旧实现（getAdjacentDocsByDepth 从笔记本根 DFS 全量枚举目标深度全部文档，
+ * 每个有子文档的节点一次 listDocsByPath，深度 4、每层 20 文档约 8400 次串行
+ * 请求）结果等价，但只沿祖先链向上、在命中方向的兄弟子树中下钻并提前终止，
+ * 请求数从 O(整棵子树) 降为 O(深度 × 分支)。
+ *
+ * @param pathObjects 从笔记本根到当前文档的完整路径
+ * @param direction "previous"：找当前文档之前的同层文档；"next"：找之后的
+ */
+async function findAdjacentSameLevelDoc(pathObjects: PathObject[], direction: "previous" | "next", cache: any) {
+    const targetDepth = pathObjects.length - 1;
+    // 从当前文档的父级逐层向上：仅当某一祖先没有本方向的兄弟时，同层相邻文档
+    // 才可能位于更上层的兄弟子树中
+    for (let i = targetDepth - 1; i >= 1; i--) {
+        const parent = pathObjects[i - 1];
+        const ancestor = pathObjects[i];
+        const siblings = await getAdjacentChildDocs(parent, cache);
+        const ancestorIndex = findAdjacentDocIndex(siblings, ancestor.id);
+        if (ancestorIndex < 0) {
+            // 树结构已变化（父目录下找不到该祖先），放弃继续向上
+            return null;
+        }
+        // 候选兄弟：previous 取祖先之前的兄弟（从最近者开始），next 取之后的
+        const candidates = direction === "previous"
+            ? siblings.slice(0, ancestorIndex).reverse()
+            : siblings.slice(ancestorIndex + 1);
+        for (const sibling of candidates) {
+            if (sibling.subFileCount === 0) {
+                // 无子文档的节点不可能包含更深层文档
+                continue;
+            }
+            const found = await findExtremeDocAtDepth(sibling, targetDepth - i, direction === "previous" ? "last" : "first", cache);
+            if (found) {
+                return found;
+            }
+        }
     }
-    const childDocs = await getAdjacentChildDocs(parentDoc, cache);
-    if (targetDepth === 1) {
-        return childDocs;
+    return null;
+}
+
+/**
+ * 在 node 子树中查找相对深度 remainingDepth（绝对深度 depth(node)+remainingDepth）
+ * 处最前（first）/最后（last）的文档；子树深度不足返回 null。
+ * 按先序遍历顺序定位，与旧实现全量枚举的顺序一致。
+ */
+async function findExtremeDocAtDepth(node: any, remainingDepth: number, direction: "first" | "last", cache: any): Promise<any | null> {
+    if (remainingDepth <= 0) {
+        return null;
     }
-    let result: any[] = [];
-    for (const childDoc of childDocs) {
-        if (childDoc.subFileCount === 0) {
+    const childDocs = await getAdjacentChildDocs(node, cache);
+    if (remainingDepth === 1) {
+        if (childDocs.length === 0) {
+            return null;
+        }
+        return direction === "last" ? childDocs[childDocs.length - 1] : childDocs[0];
+    }
+    const ordered = direction === "last" ? childDocs.slice().reverse() : childDocs;
+    for (const child of ordered) {
+        if (child.subFileCount === 0) {
             continue;
         }
-        const subDocs = await getAdjacentDocsByDepth(childDoc, targetDepth - 1, cache);
-        result = result.concat(subDocs);
+        const found = await findExtremeDocAtDepth(child, remainingDepth - 1, direction, cache);
+        if (found) {
+            return found;
+        }
     }
-    return result;
+    return null;
 }
 
 export function findAdjacentDocIndex(docList: any[], docId: string) {
