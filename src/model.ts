@@ -46,8 +46,11 @@ export async function buildEntriesFromPath(pathObjects: PathObject[], docDetail:
     // 折叠隐藏起始位置
     const foldStartAt = state.g_setting.showNotebook ? state.g_setting.foldedFrontShow :
         state.g_setting.foldedFrontShow + 1;
-    // 折叠隐藏结束位置
-    const foldEndAt = pathObjects.length - state.g_setting.foldedEndShow - 1;
+    // 折叠隐藏结束位置（至多到倒数第二个，始终保留当前文档不被折叠）
+    const foldEndAt = Math.min(
+        pathObjects.length - state.g_setting.foldedEndShow - 1,
+        pathObjects.length - 2
+    );
 
     // 根层级（工作空间），不可点击
     if (state.g_setting.showRoot) {
