@@ -1,5 +1,25 @@
 ## 更新日志
 
+### v1.0.5 (2026年8月6日)
+
+- 修复：页签关闭弃用 protyle.model.parent.parent 私有链，改用 getAllTabs + tab.parent.removeTab 公开结构，保留 pin 检查与结构探测告警；
+- 优化：菜单懒加载由每项一个 MutationObserver 改为容器级监听加鼠标事件委托，深度由 DOM 实时计算，不再随条目数创建上千观察器；菜单加载期点击外部即取消占位，避免请求完成后菜单凭空弹出；
+- 修复：子菜单缓存仅在菜单仍打开时写入，避免关闭后异步回填残留过期数据；loaded-protyle-static/switch-protyle 同一 protyle 短窗口去重，消除打开文档双倍 API 调用；
+- 优化：ws-main 结构变更按 protyle 合并为 100ms 窗口一轮并行刷新，消除批量移动 N×M 串行请求洪峰；卸载时清零去重状态与合并刷新队列；
+- 修复：初始化重试形同虚设——原逻辑从未真正设置定时器且只重试一次，重写为对真实失败点 loadSettingCache 重试最多 5 次（间隔 2s），全部失败回退默认配置继续运行；
+- 修复：fetch 无错误处理——新增 fetchJSON 统一请求层，网络异常/非 2xx/非 JSON 均告警并返回 null，各调用点补空值兜底；
+- 优化：parseDocPath 逐层级 getDocInfo 改批量 getDocsInfo（一次读盘），按 id 索引应对内核跳过不存在文档；isChildDocExist 由 listDocsByPath 全量 Ls+排序改 getDocInfo 单文档查询，图标模式直接复用批量返回的 subFileCount；
+- 修复：setPanelFocus 模拟补齐 saveLayout 与 dock 激活态及 activetime 早退；两行模式 wheel 劫持垂直滚动且 deltaMode 未归一化；destroy 后 rAF 残留写入原生 bar；
+- 优化：大纲菜单 getDocOutline 加 TTL 缓存并在结构变更时失效；标题查找改单次 DFS 建索引 O(1)；
+- 修复：相邻导航 tooltip 失焦残留；相邻文档缓存随 create 事件失效；
+- 修复：设置数值输入 NaN（清空/非法字符）时回退默认值并回写输入框，避免序列化为 null 写盘清空子文档列表；新增键级类型校验修复存量 null 坏数据；
+- 修复：设置迁移不再整表重置，改为以默认值为底合并已知键的字段级迁移，用户自定义设置全部保留；
+- 修复：冲突插件强制同行模式改为 applyConflictPluginOverride() 在加载、合并、保存三处应用，写盘值一并强制，防止被 loadData 合并与保存写入绕过；
+- 优化：保存设置不再重注入 ~10KB style、不再全量销毁重建，仅同行/两行切换才 destroyAllControllers，其余由 refresh 按模型指纹变化重建；
+- 重构：样式移出 JS 自管，新建 src/style.css 构建为 dist/index.css，由思源内核经 pluginsStyle{name} 官方机制注入，卸载时官方自动移除；
+- 修复：同行模式覆盖 savor 主题首项规则补全 host > bar 层级，使内容带清空规则真正生效；
+- 修复：渲染指纹并入仅影响渲染的设置，相邻导航显示样式等保存后立即生效；
+
 ### v1.0.4 (2026年8月6日)
 
 - 安全：文档名与图标拼入菜单 HTML 前转义，封堵两处 XSS；
