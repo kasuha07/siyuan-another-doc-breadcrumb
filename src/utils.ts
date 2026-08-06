@@ -59,15 +59,18 @@ export function getEmojiHtmlStr(iconString: any, hasChild: boolean, textClassNam
     }
     let result: any = iconString;
     // emoji地址判断逻辑为出现.，但请注意之后的补全
+    // icon 来自内核 IAL（不消毒，用户可控），拼入 HTML 前必须先转义：
+    // - img src 可注入 " onerror=；
+    // - emoji 分支的 hex 码点序列（如 3c-69-6d-...）可还原为任意 HTML 标签
     if (iconString.startsWith("api/icon/getDynamicIcon")) {
-        result = `<img class="${picClassName}" src="/${iconString}"/>`;
+        result = `<img class="${picClassName}" src="/${escapeHTML(iconString)}"/>`;
     } else if (iconString.indexOf(".") != -1) {
-        result = `<img class="${picClassName}" src="/emojis/${iconString}"/>`;
+        result = `<img class="${picClassName}" src="/emojis/${escapeHTML(iconString)}"/>`;
     } else {
         if (wrapText) {
-            result = `<span class="${textClassName}">${emojiIconHandler(iconString, hasChild)}</span>`;
+            result = `<span class="${textClassName}">${escapeHTML(emojiIconHandler(iconString, hasChild))}</span>`;
         } else {
-            result = emojiIconHandler(iconString, hasChild);
+            result = escapeHTML(emojiIconHandler(iconString, hasChild));
         }
     }
     return result;

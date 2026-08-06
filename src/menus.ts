@@ -6,7 +6,7 @@ import { CONSTANTS } from "./constants";
 import { state } from "./state";
 import { createAndOpenEmptyDocAt, getChildDocuments, openRefLinkByAPI } from "./api";
 import { errorPush } from "./logger";
-import { decodeHtmlEntities, getEmojiHtmlStr, isNotebookDocEnabled, trimListDocsByPathAPIReturnedDocName } from "./utils";
+import { decodeHtmlEntities, escapeHTML, getEmojiHtmlStr, isNotebookDocEnabled, trimListDocsByPathAPIReturnedDocName } from "./utils";
 
 /**
  * 判断在 path（父文档物理路径，.sy 结尾）下新建子文档是否超过 kernel 深度限制：
@@ -44,14 +44,16 @@ export function openHideMenu({ anchorElement, hiddenEntries }: any, event: any) 
     for (let i = 0; i < hiddenEntries.length; i++) {
         let id = hiddenEntries[i].id;
         let name = hiddenEntries[i].name;
-        let trimedName = state.g_setting.nameMaxLength > 0 && name.length > state.g_setting.nameMaxLength ?
-            name.substring(0, state.g_setting.nameMaxLength) + "..."
-            : name;
+        // 文档名来自 hPath（用户可控，可含引号/尖括号），拼入 title/文本前必须先转义
+        let fullName = escapeHTML(name);
+        let trimedName = state.g_setting.nameMaxLength > 0 && fullName.length > state.g_setting.nameMaxLength ?
+            fullName.substring(0, state.g_setting.nameMaxLength) + "..."
+            : fullName;
         let tempMenuItemObj: any = {
             iconHTML: "",
             label: `<span class="${CONSTANTS.MENU_ITEM_CLASS_NAME}" 
                 data-doc-id="${id}"
-                title="${name}">
+                title="${fullName}">
                 ${trimedName}
             </span>`,
             click: (htmlElement: any, event: any) => {
@@ -208,7 +210,8 @@ export async function openRelativeMenu({ protyle, anchorElement, parentId, nextI
     // 本层级内容
     for (let i = 0; i < siblings.length; i++) {
         let currSibling = siblings[i];
-        let docName = trimListDocsByPathAPIReturnedDocName(currSibling.name);
+        // 文档名来自内核 IAL（用户可控，可含引号/尖括号），拼入 title/文本前必须先转义
+        let docName = escapeHTML(trimListDocsByPathAPIReturnedDocName(currSibling.name));
         let trimedName = state.g_setting.nameMaxLength > 0 && docName.length > state.g_setting.nameMaxLength ?
             docName.substring(0, state.g_setting.nameMaxLength) + "..."
             : docName;
