@@ -291,6 +291,9 @@ export function clickAdjacentDocButton(event: any, docId: string) {
     if (!docId) {
         return;
     }
+    // 点击后页签切换、面包屑即将重建，旧按钮从 DOM 移除时不会触发 mouseleave，
+    // 主动移除悬浮提示，避免 tooltip 残留在屏幕上
+    removeAdjacentTooltip();
     event.preventDefault();
     event.stopImmediatePropagation();
     event.stopPropagation();

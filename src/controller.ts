@@ -14,7 +14,7 @@ import { isNotebookDocEnabled, isValidStr } from "./utils";
 import { openRefLinkAgent } from "./api";
 import { buildDocumentBreadcrumbModel } from "./model";
 import { renderBreadcrumbFragment, createBreadcrumbDivider } from "./render";
-import { createAdjacentDocNav, clickAdjacentDocButton } from "./adjacent";
+import { createAdjacentDocNav, clickAdjacentDocButton, removeAdjacentTooltip } from "./adjacent";
 import { openHideMenu, openRelativeMenu } from "./menus";
 import { addBlockBdMenuListener } from "./breadcrumbMenu";
 import type { BreadcrumbModel, ControllerAction } from "./types";
@@ -590,6 +590,9 @@ export class InlineBreadcrumbController {
         if (!this.root) {
             return;
         }
+
+        // 重建面包屑时旧按钮移除不会触发 mouseleave，主动移除相邻导航悬浮提示
+        removeAdjacentTooltip();
 
         this.root.textContent = "";
         this.actions.clear();
