@@ -32,6 +32,28 @@ import { eventBusHandler, handleDestroyProtyle, initRetry, mainEventBusHander, r
 import { isMobile, isSomePluginExist } from "./utils";
 
 /**
+ * 校验 loadData 原始载荷是否为有效配置对象：
+ * - 官方 loadData 在文件缺失时 resolve 空字符串 ""，异常时可能 resolve
+ *   错误信封 {code,msg,data}，均不能当作配置；
+ * - 仅接受“含已知设置键的纯对象”（@version 或任一设置项）；字符串先
+ *   JSON.parse（失败视为无配置）；其余一律返回 null（使用默认配置，不写盘）。
+ */
+function normalizeSettingCache(raw: any): { [key: string]: any } | null {
+    if (typeof raw === "string") {
+        try {
+            raw = JSON.parse(raw);
+        } catch (e) {
+            return null;
+        }
+    }
+    if (raw === null || typeof raw !== "object" || Array.isArray(raw)) {
+        return null;
+    }
+    const hasKnownKey = Object.keys(g_setting_default).some((key) => key in raw);
+    return hasKnownKey ? raw : null;
+}
+
+/**
  * Plugin类
  */
 export class FakeDocBreadcrumb extends Plugin {
@@ -54,9 +76,9 @@ export class FakeDocBreadcrumb extends Plugin {
     }
 
     onLayoutReady() {
-        this.loadData("settings.json").then((settingCache) => {
-            // 解析并载入配置
-            try {
+        this.loadSettingCache().then((settingCache) => {
+            if (settingCache) {
+                // 解析并载入配置（settingCache 已通过 normalizeSettingCache 校验为纯对象）
                 debugPush("载入配置中", settingCache);
                 let resetFlag = false;
                 if (settingCache["@version"]) {
@@ -74,20 +96,45 @@ export class FakeDocBreadcrumb extends Plugin {
                     } else if (settingCache["showAdjacentDocButton"] === false) {
                         settingCache["showAdjacentDocButton"] = CONSTANTS.ADJ_NONE;
                     }
-                    this.saveData(`settings.json`, JSON.stringify(settingCache));
+                    this.saveData(`settings.json`, JSON.stringify(settingCache)).catch((e) => {
+                        warnPush("配置迁移写盘失败", e);
+                    });
                 }
                 debugPush("载入配置", settingCache);
                 Object.assign(state.g_setting, settingCache);
-                this.eventBusInnerHandler();
-            } catch (e) {
-                warnPush("og-fdb载入配置时发生错误", e);
+            } else {
+                warnPush("无有效配置文件，本次使用默认配置");
             }
-            if (!initRetry()) {
-                errorPush("初始化失败，2秒后执行一次重试");
-                setTimeout(initRetry, 2000);
-            }
-        }, (e) => {
-            warnPush("配置文件读入失败", e);
+            // 事件注册不依赖配置加载成败：配置缺失或异常时以默认值继续运行，绝不静默死亡
+            this.eventBusInnerHandler();
+        });
+        // 重试逻辑与配置读取解耦：官方 loadData 在 HTTP 4xx / Abort / 网络异常时
+        // 可能永不回调（Promise 悬空），不能放在 .then 内等待
+        if (!initRetry()) {
+            errorPush("初始化失败，2秒后执行一次重试");
+            setTimeout(initRetry, 2000);
+        }
+    }
+
+    /**
+     * 带超时读取配置：官方 loadData 依赖 fetchPost 回调，异常时 Promise 可能永不
+     * settle，这里加超时竞速保证必 settle；载荷经 normalizeSettingCache 校验，
+     * 非有效配置一律按“无配置”处理（返回 null，由调用方使用默认配置）。
+     */
+    loadSettingCache(): Promise<{ [key: string]: any } | null> {
+        return new Promise((resolve) => {
+            const timer = setTimeout(() => {
+                warnPush(`读取配置文件超时（${CONSTANTS.SETTING_LOAD_TIMEOUT}ms），本次使用默认配置`);
+                resolve(null);
+            }, CONSTANTS.SETTING_LOAD_TIMEOUT);
+            this.loadData("settings.json").then((raw) => {
+                clearTimeout(timer);
+                resolve(normalizeSettingCache(raw));
+            }, () => {
+                clearTimeout(timer);
+                warnPush("配置文件读入失败，本次使用默认配置");
+                resolve(null);
+            });
         });
     }
 

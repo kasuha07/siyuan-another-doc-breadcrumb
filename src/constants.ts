@@ -12,6 +12,7 @@ export const CONSTANTS = {
     ICON_CUSTOM_ONLY: 1,
     PLUGIN_NAME: "og_fake_doc_breadcrumb",
     SAVE_TIMEOUT: 900,
+    SETTING_LOAD_TIMEOUT: 5000, // 读取配置超时兜底：官方 fetchPost 异常时可能永不回调
     CONTAINER_CLASS_NAME: "og-fake-doc-breadcrumb-container",
     INLINE_BREADCRUMB_CLASS_NAME: "og-fdb-inline-breadcrumb",
     HOST_STATE_CLASS_NAME: "og-fdb-inline-host",
