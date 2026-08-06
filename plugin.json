@@ -2,7 +2,7 @@
   "name": "siyuan-another-doc-breadcrumb",
   "author": "霞葉",
   "url": "https://github.com/kasuha07/siyuan-another-doc-breadcrumb",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "minAppVersion": "3.7.0",
   "disabledInPublish": false,
   "backends": [
