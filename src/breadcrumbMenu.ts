@@ -73,7 +73,7 @@ export async function addBlockBdMenuListener(protyle: any) {
             if (outlineData == null) {
                 state.g_relativeMenu = null;
                 logPush("获取大纲数据失败或文档无大纲。");
-                showMessage(state.language["nothingToDisplay"] + "--- fakeDocBreadcrumb");
+                showMessage(state.language["nothingToDisplay"] + "--- 另一个文档面包屑");
                 return;
             }
             // 根据图标类型来决定菜单内容
@@ -114,7 +114,7 @@ export async function addBlockBdMenuListener(protyle: any) {
             } else {
                 logPush(`点击了非文档或标题图标 (${iconHref}) 旁的箭头，不作处理。`);
                 state.g_relativeMenu = null;
-                showMessage(state.language["nothingToDisplay"] + "--- fakeDocBreadcrumb");
+                showMessage(state.language["nothingToDisplay"] + "--- 另一个文档面包屑");
                 return;
             }
 
@@ -190,7 +190,7 @@ export async function addBlockBdMenuListener(protyle: any) {
             } else {
                 state.g_relativeMenu = null;
                 logPush("没有可供显示的菜单项。");
-                showMessage(state.language["nothingToDisplay"] + "--- fakeDocBreadcrumb");
+                showMessage(state.language["nothingToDisplay"] + "--- 另一个文档面包屑");
             }
 
         } catch (error) {

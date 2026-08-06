@@ -1,5 +1,5 @@
 /**
- * 文档面包屑插件（fakeDocBreadcrumb）
+ * 文档面包屑插件（siyuan-another-doc-breadcrumb）
  *
  * v2.0.0 重构（仅支持思源 v3.7.0+）：
  * - 同行模式：插件内容容器 `.og-fdb-inline-breadcrumb` 作为原生

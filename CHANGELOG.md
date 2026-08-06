@@ -1,5 +1,16 @@
 ## 更新日志
 
+### v1.0.0 (2026年8月6日)
+
+- 分家：自 OpaqueGlass/syplugin-fakeDocBreadcrumb v2.5.0 分叉，更名为 siyuan-another-doc-breadcrumb（另一个文档面包屑）；
+- 许可证：遵循上游 AGPL-3.0，保留完整 git 历史与版权声明；
+- 移除：对 OpaqueGlass 外部调试协议（`OpaqueGlassDebugV2`）的依赖；
+- 清理：代码与文案中的旧插件名全部替换为新名；
+
+---
+
+## 上游历史（OpaqueGlass/syplugin-fakeDocBreadcrumb）
+
 ### v2.5.0 (2026年8月6日)
 
 - 移除：“自动修复聚焦错误”设置项及相关代码（修复功能已上线半年并稳定运行，不再需要开关）；

@@ -1,6 +1,6 @@
 {
-  "name": "syplugin-fakedocbreadcrumb",
-  "version": "2.5.0",
+  "name": "siyuan-another-doc-breadcrumb",
+  "version": "1.0.0",
   "description": "[中文](README_zh_CN.md) | **English**",
   "scripts": {
     "build": "npm run typecheck && node scripts/clean.js && esbuild src/index.ts --bundle --platform=node --format=cjs --target=es2017 --external:siyuan --outfile=dist/index.js && node scripts/copy-assets.js",
@@ -10,16 +10,16 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/OpaqueGlass/syplugin-fakeDocBreadcrumb.git"
+    "url": "git+https://github.com/kasuha07/siyuan-another-doc-breadcrumb.git"
   },
   "keywords": [],
   "author": "",
-  "license": "ISC",
+  "license": "AGPL-3.0",
   "type": "commonjs",
   "bugs": {
-    "url": "https://github.com/OpaqueGlass/syplugin-fakeDocBreadcrumb/issues"
+    "url": "https://github.com/kasuha07/siyuan-another-doc-breadcrumb/issues"
   },
-  "homepage": "https://github.com/OpaqueGlass/syplugin-fakeDocBreadcrumb#readme",
+  "homepage": "https://github.com/kasuha07/siyuan-another-doc-breadcrumb#readme",
   "devDependencies": {
     "@types/node": "^26.1.2",
     "esbuild": "^0.28.1",

@@ -1,22 +1,19 @@
-## fakeDocBreadcrumb （伪）文档面包屑
+## 另一个文档面包屑（siyuan-another-doc-breadcrumb）
 
 **中文** | [English](README.md)
 
 > 在编辑器上方显示当前文档路径信息的[思源笔记](https://github.com/siyuan-note/siyuan)插件。
 
-> 当前版本：v2.5.0
-> - 移除：“在更多情况下显示文档面包屑”、“输入时隐藏”等实验性功能与设置；
-> - 改进：同行模式插件与原生内容带间分隔符改为 CSS 圆点并对称间距；
-> 
-> 详见[更新日志](CHANGELOG.md)
+> **分叉声明**：本插件是 [OpaqueGlass/syplugin-fakeDocBreadcrumb](https://github.com/OpaqueGlass/syplugin-fakeDocBreadcrumb) 的分叉，采用 [AGPL-3.0](LICENSE) 许可证。版权归 OpaqueGlass 所有，修改部分版权归霞葉（kasuha）。
 
-> 插件最初在2023年4月发布，感谢陪伴！
-> 
-> 也请关注官方的推进计划：[全局面包屑](https://github.com/siyuan-note/siyuan/issues/3007)。
+> 当前版本：v1.0.0
+> - 分家自 syplugin-fakeDocBreadcrumb v2.5.0，更名另起炉灶；
+>
+> 详见[更新日志](CHANGELOG.md)
 
 ### 快速开始
 
-- 从集市下载 或 1、解压Release中的`package.zip`，2、将文件夹移动到`工作空间/data/plugins/`，3、并将文件夹重命名为`syplugin-fakeDocBreadcrumb`;
+- 从 Release 解压 `package.zip`，将文件夹移动到 `工作空间/data/plugins/`，并将文件夹重命名为 `siyuan-another-doc-breadcrumb`;
 - 开启插件即可；
 
 ### 功能说明
@@ -36,11 +33,19 @@
 - 启用“与块面包屑在同一行显示”后，文档面包屑与块面包屑显示在同一行，超长时作为一条连续内容带整体横向滚动；未启用时仍显示在块面包屑上方（占用一行）；
 - 如果主题将面包屑中文档间的分隔符显示为“/”，可能无法点击显示子文档选择菜单，需要在设置项中启用“覆盖主题面包屑分隔符“>”样式”；
 
+## 与上游的差异
+
+本插件与上游 `syplugin-fakeDocBreadcrumb` 的主要差异：
+
+- **重构**：改用 TypeScript 编写并开启 strict 类型检查；esbuild 单文件 bundle 构建；`dist/` 作为唯一插件目录；
+- **移除的设置项/功能**：自动修复聚焦错误、展开菜单时滚动到当前路径、允许悬停显示浮窗、文档重命名/移动后立即更新、在更多情况下显示、输入时隐藏、上下滑动提示、交换左右键、允许悬停浮窗；
+- **转正的功能**：在面包屑所在分屏区打开文档、下层文档菜单扩展层级、菜单中新建文档按钮；
+- **新增设置项**：上一篇/下一篇按钮显示样式；上一篇/下一篇替换当前页签（默认关闭）；
+- **其他**：同行模式插件与原生内容带间分隔符改为 CSS 圆点并对称间距；移除对 OpaqueGlass 外部调试协议（`OpaqueGlassDebugV2`）的依赖。
+
 ## 反馈bug
 
-（推荐）请前往[github仓库](https://github.com/OpaqueGlass/syplugin-fakeDocBreadcrumb)反馈问题。
-
-如果您无法访问github，请[在此反馈](https://wj.qq.com/s2/12395364/b69f/)。
+请前往[github仓库](https://github.com/kasuha07/siyuan-another-doc-breadcrumb)反馈问题。
 
 ### 参考&感谢
 

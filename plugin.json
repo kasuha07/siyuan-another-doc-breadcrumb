@@ -1,8 +1,8 @@
 {
-  "name": "syplugin-fakeDocBreadcrumb",
-  "author": "OpaqueGlass",
-  "url": "https://github.com/OpaqueGlass/syplugin-fakeDocBreadcrumb",
-  "version": "2.5.0",
+  "name": "siyuan-another-doc-breadcrumb",
+  "author": "霞葉",
+  "url": "https://github.com/kasuha07/siyuan-another-doc-breadcrumb",
+  "version": "1.0.0",
   "minAppVersion": "3.7.0",
   "disabledInPublish": false,
   "backends": [
@@ -17,13 +17,13 @@
     "browser-desktop"
   ],
   "displayName": {
-    "default": "fakeDocBreadcrumb",
-    "zh-CN": "(伪)文档面包屑",
-    "en": "Fake Doc Breadcrumb"
+    "default": "Another Doc Breadcrumb",
+    "zh-CN": "另一个文档面包屑",
+    "en": "Another Doc Breadcrumb"
   },
   "description": {
-    "default": "Add a doc-breadcrumb",
-    "zh-CN": "再添加一个文档面包屑：在编辑区域顶部添加可跳转的文档路径信息导航条",
+    "default": "Add a document breadcrumb",
+    "zh-CN": "在编辑区域顶部添加可跳转的文档路径信息导航条",
     "en": "Add a document breadcrumb. Add document path information that can be jumped to at the top of the editing area."
   },
   "readme": {
@@ -35,9 +35,7 @@
     "openCollective": "",
     "patreon": "",
     "github": "",
-    "custom": [
-      "https://wj.qq.com/s2/12395364/b69f/"
-    ]
+    "custom": []
   },
   "keywords": [
     "面包屑",

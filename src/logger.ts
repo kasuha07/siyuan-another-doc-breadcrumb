@@ -1,6 +1,5 @@
 // debug push
 export let g_DEBUG = 2;
-export const g_NAME = "fdb";
 export const g_FULLNAME = "文档面包屑";
 
 /*
@@ -12,12 +11,7 @@ LEVEL 4 Err + Warn + Info + Log
 LEVEL 5 Err + Warn + Info + Log + Debug
 */
 function commonPushCheck() {
-    // window.top 在插件 iframe 环境必存在；OpaqueGlassDebugV2 为外部调试脚本注入，Window 类型无对应声明
-    const topWindow = window.top as any;
-    if (topWindow["OpaqueGlassDebugV2"] == undefined || topWindow["OpaqueGlassDebugV2"][g_NAME] == undefined) {
-        return g_DEBUG;
-    }
-    return topWindow["OpaqueGlassDebugV2"][g_NAME];
+    return g_DEBUG;
 }
 
 export function isDebugMode() {
