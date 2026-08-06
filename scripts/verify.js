@@ -60,8 +60,8 @@ if (relativeRequires.length > 0) {
 }
 console.log('OK: bundle 内无相对路径 require');
 
-// 验证入口默认导出
-const root = require('../index.js');
+// 验证入口默认导出（dist 是唯一插件目录，直接加载构建产物；根目录无入口转发文件）
+const root = require('../dist/index.js');
 const entry = root.default || root;
 if (typeof entry !== 'function' && typeof entry !== 'object') {
     console.error('FAIL: 入口导出不是插件类');
