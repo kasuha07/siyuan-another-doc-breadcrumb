@@ -346,8 +346,8 @@ export function addLazyLoadEventListeners(menuElement: Element, maxDepth: number
                 return;
             }
 
-            // 创建子文档菜单项
-            if (!isCreateDocDepthLimited(path)) {
+            // 创建子文档菜单项（与首层级菜单一致：受“在文档菜单中显示新建文档按钮”设置项控制）
+            if (state.g_setting.createDocBtnInMenu && !isCreateDocDepthLimited(path)) {
                 // Menu Item
                 const menuItemEl = document.createElement('button');
                 menuItemEl.className = 'b3-menu__item';
