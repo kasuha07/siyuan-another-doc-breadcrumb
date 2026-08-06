@@ -5,7 +5,7 @@ import { CONSTANTS } from "./constants";
 import { debugPush, logPush } from "./logger";
 import { state } from "./state";
 import { getAdjacentDocs } from "./adjacent";
-import { getCurrentDocDetail, getDocInfo, getHPathByID, getNotebooks, listDocsByPath } from "./api";
+import { getCurrentDocDetail, getDocInfo, getDocsInfo, getHPathByID, getNotebooks } from "./api";
 import { getListDocsByPathAPIFilePath, isNotebookDoc, isNotebookDocEnabled, isValidStr } from "./utils";
 import type { BreadcrumbEntry, BreadcrumbModel, PathObject } from "./types";
 
@@ -136,22 +136,27 @@ export async function buildEntriesFromPath(pathObjects: PathObject[], docDetail:
     // 最后一个文档、且不含子文档时不再显示箭头
     const lastEntry = entries[entries.length - 1];
     if (lastEntry && lastEntry.kind === "document") {
-        lastEntry.hasChildren = await isChildDocExist(docDetail, lastEntry.id);
+        const subFileCount = lastEntry.subFileCount ?? -1;
+        // 图标模式下 subFileCount 已随批量 getDocsInfo 返回（未知为 -1），直接复用
+        // 零额外请求；仅当未知（无图标模式）时才降级单文档查询
+        lastEntry.hasChildren = subFileCount >= 0
+            ? subFileCount > 0
+            : await isChildDocExist(lastEntry.id!);
     }
 
     return entries;
 }
 
-async function isChildDocExist(docDetail: any, id: any) {
-    const sqlResponse = await listDocsByPath({
-        path: docDetail.path,
-        notebook: docDetail.box,
-        maxListLength: 3
-    });
-    if (sqlResponse && sqlResponse.files.length > 0) {
-        return true;
-    }
-    return false;
+/**
+ * 当前文档是否含有子文档（无图标模式下 subFileCount 未知时的兜底查询）。
+ * 用单文档 getDocInfo 的 subFileCount 替代 listDocsByPath：后者在内核中先全量
+ * Ls + 逐子文档读 IAL + 排序，再按 maxListCount 截断（kernel/model/file.go
+ * ListDocTree），maxListLength=3 无法减少开销；getDocInfo 仅一次 FlushTxQueue +
+ * 读当前文档 + 读其目录，且对已解锁加密笔记本同样有效（内核自带加密兜底）。
+ */
+async function isChildDocExist(id: string) {
+    const info = await getDocInfo(id);
+    return (info?.subFileCount ?? 0) > 0;
 }
 
 export async function parseDocPath(docDetail: any): Promise<PathObject[]> {
@@ -190,17 +195,21 @@ export async function parseDocPath(docDetail: any): Promise<PathObject[]> {
     let icons = [""]
     let subFileCounts = [-1]
     if (state.g_setting.icon != CONSTANTS.ICON_NONE) {
-        let promiseList = [];
-        for (let i = 1; i < pathArray.length; i++) {
-            promiseList.push(getDocInfo(pathArray[i]));
-        }
-        // Promise.all 中任一 getDocInfo 失败（父文档被删/移动/内核异常）都会整体 reject、
-        // 中断整条构建链导致面包屑空白，故逐项 catch 降级为 null，配合下方 ?. 逐点兜底
-        let iconResult = await Promise.all(promiseList.map(p => p.catch(() => null)));
-        for (let i of iconResult) {
-            // getDocInfo 可能返回 null（内核异常），逐项降级，单项失败不中断构建链
-            icons.push(i?.icon ?? "");
-            subFileCounts.push(i?.subFileCount ?? -1);
+        // 批量 getDocsInfo 替代逐层级 getDocInfo：每层一次请求都会触发内核
+        // FlushTxQueue + 读盘（kernel/model/blockinfo.go），层级深时开销成倍放大。
+        // 内核按输入 id 顺序返回已找到文档的信息、跳过不存在的文档（数组可能
+        // 变短），故按 id 建索引逐项取值；请求整体失败（返回 null）时全部降级
+        // 为空串/-1，单项缺失或异常不中断构建链。
+        const ids = pathArray.slice(1);
+        // pathArray 为空（docPath 为 null 的降级路径）时无需发起请求
+        if (ids.length > 0) {
+            const infoList = await getDocsInfo(ids);
+            const infoMap = new Map<string, any>((infoList ?? []).map((i: any) => [i?.id, i]));
+            for (let i = 1; i < pathArray.length; i++) {
+                const info = infoMap.get(pathArray[i]);
+                icons.push(info?.icon ?? "");
+                subFileCounts.push(info?.subFileCount ?? -1);
+            }
         }
     }
     let temp_path = "";

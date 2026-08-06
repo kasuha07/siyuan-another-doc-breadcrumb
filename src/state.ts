@@ -6,8 +6,6 @@
 import { zh_CN } from "./constants";
 
 export interface StateShape {
-    g_initRetryInterval: any;
-    g_initFailedMsgTimeout: any;
     g_TIMER_LABLE_NAME_COMPARE: string;
     g_writeStorage: any;
     g_pluginInstance: any;
@@ -19,8 +17,6 @@ export interface StateShape {
 }
 
 export const state: StateShape = {
-    g_initRetryInterval: undefined,
-    g_initFailedMsgTimeout: undefined,
     g_TIMER_LABLE_NAME_COMPARE: "文档面包屑插件",
     g_writeStorage: undefined,
     g_pluginInstance: undefined,

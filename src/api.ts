@@ -27,7 +27,7 @@ export async function getNodebookList() {
     // Box.encrypted/unlocked 字段（较新版本才存在，不宜依赖）。
     let url = "/api/notebook/lsNotebooks";
     let response = await postRequest({}, url);
-    if (response.code == 0 && response.data != null && "notebooks" in response.data) {
+    if (response != null && response.code == 0 && response.data != null && "notebooks" in response.data) {
         return response.data.notebooks;
     }
     return null;
@@ -80,20 +80,21 @@ export async function listDocTree(notebook: string, path: string) {
         path
     }
     let response = await postRequest(postBody, url);
-    if (response.code == 0) {
+    if (response?.code == 0) {
         return response.data.tree;
     } else {
-        throw new Error("listDocTree Failed: " + response.msg);
+        // response 为 null（网络/解析失败）时给出可读错误，避免解引用 null
+        throw new Error("listDocTree Failed: " + (response?.msg ?? "请求失败"));
     }
 }
 
 export async function getNotebookInfo(notebookId: string) {
     let url = "/api/notebook/getNotebookInfo";
     let response = await postRequest({ notebook: notebookId }, url);
-    if (response.code == 0 && response.data != null) {
+    if (response != null && response.code == 0 && response.data != null) {
         return response.data.boxInfo;
     } else {
-        warnPush("请求笔记本信息时出错  ", response["msg"])
+        warnPush("请求笔记本信息时出错", response?.["msg"] ?? "请求失败")
     }
     return null;
 }
@@ -112,31 +113,48 @@ export async function getChildDocuments(docId: string, sqlResult: any[]) {
     return childDocs.files;
 }
 
+/**
+ * 统一的 POST + JSON 解析请求层。任何失败都 warnPush 并返回 null，绝不 reject：
+ * 1. fetch 网络异常（断网/内核未就绪）：捕获后返回 null，不再静默；
+ * 2. 响应非 2xx 或非 JSON（内核异常时可能返回 HTML 错误页）：返回 null，
+ *    不再向调用方抛 SyntaxError；
+ * 3. JSON 解析失败：同上返回 null。
+ * 调用方按既定协议对 null 降级（parseBody 短路、?. 兜底、显式判空）。
+ */
+async function fetchJSON(url: string, data: any): Promise<any | null> {
+    let response: Response;
+    try {
+        response = await fetch(url, {
+            body: JSON.stringify(data),
+            method: 'POST'
+        });
+    } catch (err) {
+        warnPush("网络请求失败", url, err);
+        return null;
+    }
+    if (!response.ok || !(response.headers.get("content-type") ?? "").includes("application/json")) {
+        warnPush("API 响应异常（非 2xx 或非 JSON）", url, response.status);
+        return null;
+    }
+    try {
+        return await response.json();
+    } catch (err) {
+        warnPush("API 响应 JSON 解析失败", url, err);
+        return null;
+    }
+}
+
 async function postRequest(data: any, url: string) {
-    let response = await fetch(url, {
-        body: JSON.stringify(data),
-        method: 'POST'
-    }).then(function (response) {
-        return response.json();
-    });
-    return response;
+    return fetchJSON(url, data);
 }
 
 export async function request(url: string, data: any) {
-    let resData: any = null;
-    await fetch(url, {
-        body: JSON.stringify(data),
-        method: 'POST'
-    }).then(function (response) {
-        resData = response.json();
-    });
-    return resData;
+    return fetchJSON(url, data);
 }
 
 export async function parseBody(response: any) {
-    // 请求层两种失败形态都按既定协议返回 null 由调用方降级，绝不向上抛：
-    // 1. fetch 网络异常时 request 返回 null → 直接短路返回 null，避免对 null 取 .code 抛 TypeError；
-    // 2. 响应非 JSON（如内核异常返回 HTML 错误页）时 response.json() reject → 捕获后返回 null。
+    // 请求层失败已由 fetchJSON 归并为返回 null（request/postRequest 绝不 reject），
+    // 这里 try/catch 仅为防御性兜底：null 直接短路，避免对 null 取 .code 抛 TypeError。
     let r: any = null;
     try {
         r = await response;
@@ -187,7 +205,7 @@ export async function getDocOutline(docId: string) {
     let url = "/api/outline/getDocOutline";
     let data = { "id": docId };
     let response = await request(url, data);
-    if (response.code == 0) {
+    if (response?.code == 0) {
         return response.data;
     } else {
         return null;
@@ -201,6 +219,20 @@ export async function getDocInfo(docId: string) {
     // 返回 code!=0 → parseBody 为 null，由调用方逐点降级。该兜底未在 API 文档声明。
     let url = `/api/block/getDocInfo`;
     return parseBody(request(url, { id: docId }));
+}
+
+/**
+ * 批量获取多个文档的 BlockInfo（/api/block/getDocsInfo，内核一次 FlushTxQueue
+ * + 批量读盘，替代逐文档 getDocInfo 的重型调用）。
+ * - refCount/av 必须显式传 false：本插件只需 icon/subFileCount，跳过内核 refs
+ *   与属性视图查询；且内核对两参数做 `.(bool)` 断言，缺参会直接 panic；
+ * - 内核按输入 id 顺序返回已找到文档的信息，不存在的文档直接跳过（数组可能
+ *   变短），调用方应按 BlockInfo.id 索引而非按下标取值；
+ * - 请求失败（返回 null）时由调用方整体降级。
+ */
+export async function getDocsInfo(ids: string[]) {
+    let url = `/api/block/getDocsInfo`;
+    return parseBody(request(url, { ids, refCount: false, av: false }));
 }
 
 export async function listDocsByPath({ path, notebook = undefined, sort = undefined, maxListLength = undefined, ignoreDocMaxNum = false }: any) {

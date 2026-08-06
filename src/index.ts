@@ -23,13 +23,13 @@
 import { Dialog, Plugin, showMessage } from "siyuan";
 import { CONSTANTS, g_setting_default } from "./constants";
 import { state } from "./state";
-import { debugPush, errorPush, warnPush } from "./logger";
+import { debugPush, warnPush } from "./logger";
 import { generateSettingPanel, loadUISettings, SettingProperty } from "./settings";
 import { removeStyle, setStyle } from "./style";
 import { destroyAllControllers } from "./controller";
 import { removeAdjacentTooltip } from "./adjacent";
-import { eventBusHandler, handleDestroyProtyle, initRetry, mainEventBusHander, refreshAllShowingProtyles, resetEventState } from "./events";
-import { isMobile, isSomePluginExist } from "./utils";
+import { eventBusHandler, handleDestroyProtyle, mainEventBusHander, refreshAllShowingProtyles, resetEventState } from "./events";
+import { isMobile, isSomePluginExist, sleep } from "./utils";
 
 /**
  * 校验 loadData 原始载荷是否为有效配置对象：
@@ -76,44 +76,63 @@ export class FakeDocBreadcrumb extends Plugin {
     }
 
     onLayoutReady() {
-        this.loadSettingCache().then((settingCache) => {
-            if (settingCache) {
-                // 解析并载入配置（settingCache 已通过 normalizeSettingCache 校验为纯对象）
-                debugPush("载入配置中", settingCache);
-                let resetFlag = false;
-                if (settingCache["@version"]) {
-                    if (settingCache["@version"] < g_setting_default["@version"]) {
-                        debugPush("配置版本过旧");
-                        resetFlag = true;
-                    }
-                } else if (settingCache["@version"] === undefined) {
+        this.initialize();
+    }
+
+    /**
+     * 布局就绪后的初始化：加载配置 → 应用配置 → 注册事件 → 注入样式。
+     *
+     * 失败点与重试：官方 loadData 在 HTTP 4xx / Abort / 网络异常时可能永不回调
+     * （Promise 悬空），loadSettingCache 已用超时兜底 resolve null；配置加载失败
+     * （超时/无效）时按固定间隔重试整个加载流程（最多 INIT_RETRY_MAX 次），
+     * 而不是只重试一次。全部失败则回退默认配置继续运行；
+     * 事件注册与样式注入无论配置是否加载成功都只执行一次（重复注册会导致
+     * 事件总线收到双份消息）。
+     */
+    async initialize() {
+        let settingCache: { [key: string]: any } | null = null;
+        for (let attempt = 1; attempt <= CONSTANTS.INIT_RETRY_MAX; attempt++) {
+            settingCache = await this.loadSettingCache();
+            if (settingCache != null) {
+                break;
+            }
+            if (attempt < CONSTANTS.INIT_RETRY_MAX) {
+                warnPush(`配置加载失败（第 ${attempt}/${CONSTANTS.INIT_RETRY_MAX} 次），${CONSTANTS.INIT_RETRY_INTERVAL / 1000} 秒后重试`);
+                await sleep(CONSTANTS.INIT_RETRY_INTERVAL);
+            }
+        }
+        if (settingCache != null) {
+            // 解析并载入配置（settingCache 已通过 normalizeSettingCache 校验为纯对象）
+            debugPush("载入配置中", settingCache);
+            let resetFlag = false;
+            if (settingCache["@version"]) {
+                if (settingCache["@version"] < g_setting_default["@version"]) {
+                    debugPush("配置版本过旧");
                     resetFlag = true;
                 }
-                if (resetFlag) {
-                    settingCache["@version"] = g_setting_default["@version"];
-                    if (settingCache["showAdjacentDocButton"] === true) {
-                        settingCache["showAdjacentDocButton"] = CONSTANTS.ADJ_SAME_LEVEL;
-                    } else if (settingCache["showAdjacentDocButton"] === false) {
-                        settingCache["showAdjacentDocButton"] = CONSTANTS.ADJ_NONE;
-                    }
-                    this.saveData(`settings.json`, JSON.stringify(settingCache)).catch((e) => {
-                        warnPush("配置迁移写盘失败", e);
-                    });
-                }
-                debugPush("载入配置", settingCache);
-                Object.assign(state.g_setting, settingCache);
-            } else {
-                warnPush("无有效配置文件，本次使用默认配置");
+            } else if (settingCache["@version"] === undefined) {
+                resetFlag = true;
             }
-            // 事件注册不依赖配置加载成败：配置缺失或异常时以默认值继续运行，绝不静默死亡
-            this.eventBusInnerHandler();
-        });
-        // 重试逻辑与配置读取解耦：官方 loadData 在 HTTP 4xx / Abort / 网络异常时
-        // 可能永不回调（Promise 悬空），不能放在 .then 内等待
-        if (!initRetry()) {
-            errorPush("初始化失败，2秒后执行一次重试");
-            setTimeout(initRetry, 2000);
+            if (resetFlag) {
+                settingCache["@version"] = g_setting_default["@version"];
+                if (settingCache["showAdjacentDocButton"] === true) {
+                    settingCache["showAdjacentDocButton"] = CONSTANTS.ADJ_SAME_LEVEL;
+                } else if (settingCache["showAdjacentDocButton"] === false) {
+                    settingCache["showAdjacentDocButton"] = CONSTANTS.ADJ_NONE;
+                }
+                this.saveData(`settings.json`, JSON.stringify(settingCache)).catch((e) => {
+                    warnPush("配置迁移写盘失败", e);
+                });
+            }
+            debugPush("载入配置", settingCache);
+            Object.assign(state.g_setting, settingCache);
+        } else {
+            warnPush("无有效配置文件，本次使用默认配置");
         }
+        // 事件注册不依赖配置加载成败：配置缺失或异常时以默认值继续运行，绝不静默死亡
+        this.eventBusInnerHandler();
+        removeStyle();
+        setStyle();
     }
 
     /**

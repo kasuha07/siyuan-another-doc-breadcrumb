@@ -10,6 +10,12 @@ export const CONSTANTS = {
     ICON_ALL: 2,
     ICON_NONE: 0,
     ICON_CUSTOM_ONLY: 1,
+
+    // 初始化配置加载失败时的重试策略：官方 loadData 在 HTTP 4xx / Abort /
+    // 网络异常时可能永不回调，loadSettingCache 以超时兜底；失败后按固定间隔
+    // 重试整个加载流程（而非只重试一次），全部失败则回退默认配置继续运行。
+    INIT_RETRY_MAX: 5,
+    INIT_RETRY_INTERVAL: 2000,
     PLUGIN_NAME: "og_fake_doc_breadcrumb",
     SAVE_TIMEOUT: 900,
     SETTING_LOAD_TIMEOUT: 5000, // 读取配置超时兜底：官方 fetchPost 异常时可能永不回调

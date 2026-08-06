@@ -2,30 +2,10 @@
  * 初始化、事件总线与鼠标键盘监听
  */
 import * as siyuan from "siyuan";
-import { CONSTANTS } from "./constants";
-import { debugPush, errorPush, infoPush, logPush, warnPush } from "./logger";
+import { debugPush, errorPush, infoPush, warnPush } from "./logger";
 import { state } from "./state";
 import { getAllShowingDocId } from "./utils";
-import { removeStyle, setStyle } from "./style";
 import { destroyAllControllers, inlineControllerRegistry } from "./controller";
-
-export function initRetry() {
-    let successFlag = false;
-    try {
-        removeStyle();
-        setStyle();
-        successFlag = true;
-        clearTimeout(state.g_initFailedMsgTimeout);
-    } catch (e) {
-        errorPush("文档面包屑插件初始化失败", e);
-    }
-    if (successFlag) {
-        clearInterval(state.g_initRetryInterval);
-        logPush("文档面包屑插件初始化成功");
-        return true;
-    }
-    return false;
-}
 
 /**
  * loaded-protyle-static / switch-protyle 双事件去重：
