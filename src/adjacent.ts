@@ -140,10 +140,10 @@ export function createAdjacentDocButton(direction: string, doc: any, isSameLevel
 }
 
 export function trimDocName(name: string, maxLength: number) {
-    if (name.length <= maxLength) {
+    if (maxLength <= 0 || name.length <= maxLength) {
         return name;
     }
-    return name.substring(0, state.g_setting.nameMaxLength) + "...";
+    return name.substring(0, maxLength) + "...";
 }
 
 export async function getAdjacentDocs(pathObjects: PathObject[], notebookDocFlag: boolean): Promise<AdjacentResult> {

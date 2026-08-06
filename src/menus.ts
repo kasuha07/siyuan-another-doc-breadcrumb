@@ -44,7 +44,7 @@ export function openHideMenu({ anchorElement, hiddenEntries }: any, event: any) 
     for (let i = 0; i < hiddenEntries.length; i++) {
         let id = hiddenEntries[i].id;
         let name = hiddenEntries[i].name;
-        let trimedName = name.length > state.g_setting.nameMaxLength ?
+        let trimedName = state.g_setting.nameMaxLength > 0 && name.length > state.g_setting.nameMaxLength ?
             name.substring(0, state.g_setting.nameMaxLength) + "..."
             : name;
         let tempMenuItemObj: any = {
@@ -208,7 +208,7 @@ export async function openRelativeMenu({ protyle, anchorElement, parentId, nextI
     for (let i = 0; i < siblings.length; i++) {
         let currSibling = siblings[i];
         let docName = trimListDocsByPathAPIReturnedDocName(currSibling.name);
-        let trimedName = docName.length > state.g_setting.nameMaxLength ?
+        let trimedName = state.g_setting.nameMaxLength > 0 && docName.length > state.g_setting.nameMaxLength ?
             docName.substring(0, state.g_setting.nameMaxLength) + "..."
             : docName;
         let tempMenuItemObj: any = {
@@ -382,7 +382,7 @@ export function addLazyLoadEventListeners(menuElement: Element, maxDepth: number
             // 子文档菜单
             for (const childDoc of childDocuments) {
                 const docName = trimListDocsByPathAPIReturnedDocName(childDoc.name);
-                const trimedName = docName.length > state.g_setting.nameMaxLength ?
+                const trimedName = state.g_setting.nameMaxLength > 0 && docName.length > state.g_setting.nameMaxLength ?
                     docName.substring(0, state.g_setting.nameMaxLength) + "..." :
                     docName;
                 const hasChildren = childDoc.subFileCount > 0 && (currentDepth + 1) < maxDepth;

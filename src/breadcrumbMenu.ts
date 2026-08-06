@@ -122,7 +122,7 @@ export async function addBlockBdMenuListener(protyle: any) {
             function buildMenuItems(items: any[]): any[] {
                 return items.map(item => {
                     const fullName = escapeHTML(stripHTML(item.name || item.content || "N/A"));
-                    const trimedName = fullName.length > state.g_setting.nameMaxLength ? fullName.substring(0, state.g_setting.nameMaxLength) + "..." : fullName;
+                    const trimedName = state.g_setting.nameMaxLength > 0 && fullName.length > state.g_setting.nameMaxLength ? fullName.substring(0, state.g_setting.nameMaxLength) + "..." : fullName;
                     const menuItem: any = {
                         id: item.id,
                         label: `<span class="${CONSTANTS.MENU_ITEM_CLASS_NAME}" 
