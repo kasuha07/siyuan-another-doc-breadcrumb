@@ -31,6 +31,8 @@
     "setting_showAdjacentDocButton_option_2": "Show for same level documents",
     "setting_adjacentNavStyle_name": "Style of the previous/next document buttons",
     "setting_adjacentNavStyle_desp": "Controls how the previous/next document buttons are displayed; when arrows only, hovering over a button shows the document name",
+    "setting_replaceAdjacentDocTab_name": "Open previous/next document in the current tab",
+    "setting_replaceAdjacentDocTab_desp": "When clicking the previous/next document buttons, replace the current tab instead of opening a new one; pinned tabs are never replaced, and holding Ctrl/Alt/Shift while clicking keeps the current tab open.",
     "setting_adjacentNavStyle_option_0": "Arrow + document name",
     "setting_adjacentNavStyle_option_1": "Arrow only",
     "setting_createDocBtnInMenu_name": "Show create document button in document menu",

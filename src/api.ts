@@ -268,14 +268,17 @@ export function openRefLinkByAPI({ mouseEvent, paramDocId = "", keyParam = {}, o
         keepCursor: isEventCtrlKey(keyParam) ? true : undefined,
         removeCurrentTab: removeCurrentTab, // 目前这个选项的行为是：true，则当前页签打开；false，则根据思源设置：新页签打开
     };
+    // 后台打开页签不可移除。用 afterOpen 回调关闭旧页签：openTab 内部先异步
+    // 获取块信息再创建新页签，若提前同步关闭旧页签，分屏仅剩一个页签时
+    // 会触发思源销毁整个分屏（layout/Wnd.ts removeTabAction），破坏布局。
+    if (removeCurrentTab && !isEventCtrlKey(keyParam)) {
+        finalParam.afterOpen = () => {
+            debugPush("插件自行移除页签");
+            removeCurrentTabF(needToCloseDocId);
+        };
+    }
     debugPush("打开文档执行参数", finalParam);
     openTab(finalParam);
-    // 后台打开页签不可移除
-    if (removeCurrentTab && !isEventCtrlKey(keyParam)) {
-        debugPush("插件自行移除页签");
-        removeCurrentTabF(needToCloseDocId);
-        removeCurrentTab = false;
-    }
 }
 
 export function removeCurrentTabF(docId: string | null) {

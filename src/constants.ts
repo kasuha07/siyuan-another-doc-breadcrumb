@@ -45,6 +45,7 @@ export const g_setting_default = {
     "showRoot": false,
     "showAdjacentDocButton": CONSTANTS.ADJ_SAME_LEVEL,
     "adjacentNavStyle": CONSTANTS.ADJ_SHOW_TEXT,
+    "replaceAdjacentDocTab": false, // 点击上一篇/下一篇时替换当前页签（默认关闭）
     "createDocBtnInMenu": true,
 };
 
@@ -58,6 +59,8 @@ export let zh_CN: { [key: string]: string } = {
     "setting_docMaxNum_desp": "当子文档或同级文档超过该值时，后续文档将不再显示。设置为0则不限制。",
     "setting_showAdjacentDocButton_name": "显示上一篇/下一篇按钮",
     "setting_showAdjacentDocButton_desp": "在文档面包屑右侧显示上一篇文档和下一篇文档按钮；按文件树顺序在同一层级深度的文档之间跳转。",
+    "setting_replaceAdjacentDocTab_name": "在当前位置打开上一篇/下一篇",
+    "setting_replaceAdjacentDocTab_desp": "点击上一篇/下一篇按钮时，替换当前打开的页签而不是打开新页签；固定页签不会被替换，按住 Ctrl/Alt/Shift 点击时仍保留当前页签。",
     "createDocFailed": "创建文档失败",
     "previous_doc": "上一篇文档",
     "next_doc": "下一篇文档",

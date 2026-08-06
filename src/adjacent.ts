@@ -294,8 +294,11 @@ export function clickAdjacentDocButton(event: any, docId: string) {
     event.preventDefault();
     event.stopImmediatePropagation();
     event.stopPropagation();
+    // 设置开启且无修饰键点击时，替换当前页签；Ctrl（后台）/Alt（右侧分屏）/Shift（下方分屏）打开时保留原页签
+    const plainClick = !(event?.ctrlKey || event?.metaKey || event?.shiftKey || event?.altKey);
     openRefLinkByAPI({
         paramDocId: docId,
+        removeCurrentTab: plainClick && !!state.g_setting.replaceAdjacentDocTab,
         keyParam: {
             ctrlKey: event?.ctrlKey,
             shiftKey: event?.shiftKey,

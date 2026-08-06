@@ -18,6 +18,7 @@
 - (Setting) The sub-document menu supports further expansion according to the hierarchy, up to 7 levels;
 - (Setting) When the hierarchy exceeds 5 levels, the first 2 levels and the last 3 levels are retained by default;
 - (Setting) Show previous/next document buttons on the right side of the breadcrumb;
+- (Setting) Open previous/next document in the current tab (replace the current tab, disabled by default);
 - (Setting) Show new document button in the menu;
 
 #### Other explanation

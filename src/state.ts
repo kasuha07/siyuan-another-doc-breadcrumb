@@ -38,6 +38,7 @@ export const state: StateShape = {
         "menuExtendSubDocDepth": null,
         "showRoot": null,
         "showAdjacentDocButton": null,
+        "replaceAdjacentDocTab": null,
         "createDocBtnInMenu": null,
     },
     language: zh_CN,

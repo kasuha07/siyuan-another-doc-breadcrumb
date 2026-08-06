@@ -169,6 +169,7 @@ export class FakeDocBreadcrumb extends Plugin {
                 { value: CONSTANTS.ADJ_SHOW_TEXT },
                 { value: CONSTANTS.ADJ_ARROW_ONLY },
             ]),
+            new SettingProperty("replaceAdjacentDocTab", "SWITCH", null),
             new SettingProperty("createDocBtnInMenu", "SWITCH", null),
         ]));
 
