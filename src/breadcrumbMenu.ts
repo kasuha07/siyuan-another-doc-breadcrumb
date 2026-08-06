@@ -150,10 +150,11 @@ export async function addBlockBdMenuListener(protyle: any) {
                             if (blocId) {
                                 openTab({
                                     app: getPluginInstance().app,
+                                    // 不能带 keepCursor：目标已打开时 switchEditor 首行直接 return，
+                                    // 既不切 tab 也不执行 cb-get-focus 定位（对照 siyuan editor/util.ts switchEditor）
                                     doc: {
                                         id: blocId,
                                         action: ["cb-get-focus", "cb-get-scroll"],
-                                        keepCursor: true,
                                     } as any,
                                     afterOpen: () => {
                                         // 更新breadcrumb
