@@ -103,26 +103,57 @@ export function createInlineRoot() {
  * --ellipsis class（max-width: 112px 省略号截断）；同行模式为 nowrap
  * 永不换行，原生逻辑不会触发，这里改用横向溢出（scrollWidth > clientWidth）
  * 判断，同样逐个压缩文本，直到不再溢出；全部压缩后仍放不下则保留滚动。
+ *
+ * 性能：scrollWidth 读取是强制同步布局（reflow），且压缩前 k 个文本后
+ * 容器宽度随 k 单调非增，因此用二分查找最小压缩个数，把 reflow 次数
+ * 从 O(n)（逐个压缩）降到 O(log n)；class 切换用增量指针只调整边界
+ * 元素，避免每次迭代线性扫描。
  */
 export function applyBreadcrumbEllipsis(bar: HTMLElement) {
     if (!bar.isConnected) {
         return;
     }
     const textElements = Array.from(bar.querySelectorAll(".protyle-breadcrumb__text"));
-    if (textElements.length <= 1) {
+    const count = textElements.length;
+    if (count <= 1) {
         return;
     }
     // 先清除旧标记：容器变宽后需重新完整显示，再按当前宽度重算
     textElements.forEach((item) => {
         item.classList.remove("protyle-breadcrumb__text--ellipsis");
     });
-    while (bar.scrollWidth > bar.clientWidth) {
-        const target = textElements.find((item) => !item.classList.contains("protyle-breadcrumb__text--ellipsis"));
-        if (!target) {
-            break;
-        }
-        target.classList.add("protyle-breadcrumb__text--ellipsis");
+    // 全部展开也不溢出：无需压缩
+    if (bar.scrollWidth <= bar.clientWidth) {
+        return;
     }
+
+    // 增量调整“已压缩个数”，只增删边界元素的 class
+    let applied = 0;
+    const setApplied = (k: number) => {
+        while (applied < k) {
+            textElements[applied].classList.add("protyle-breadcrumb__text--ellipsis");
+            applied += 1;
+        }
+        while (applied > k) {
+            applied -= 1;
+            textElements[applied].classList.remove("protyle-breadcrumb__text--ellipsis");
+        }
+    };
+
+    // 二分查找最小的压缩个数 k，使容器不再溢出；
+    // 全部压缩后仍溢出则 high 停在 count，保留滚动（与旧行为一致）
+    let low = 0; // 已知溢出：全部展开
+    let high = count;
+    while (low + 1 < high) {
+        const mid = (low + high) >> 1;
+        setApplied(mid);
+        if (bar.scrollWidth > bar.clientWidth) {
+            low = mid;
+        } else {
+            high = mid;
+        }
+    }
+    setApplied(high);
 }
 
 /**
@@ -165,6 +196,8 @@ export class InlineBreadcrumbController {
     lastFingerprint: string | null = null;
     contentObserver: MutationObserver | null = null;
     resizeObserver: ResizeObserver | null = null;
+    /** 分屏拖拽等连续尺寸变化时，ResizeObserver 以 rAF 合并为每帧最多一次重算 */
+    resizeFrame = 0;
     root: HTMLElement | null = null;
     wrapper: HTMLElement | null = null;
     host: HTMLElement | null = null;
@@ -228,10 +261,7 @@ export class InlineBreadcrumbController {
             this.startContentRestore();
             // 容器宽度变化（窗口缩放、侧栏开关、分屏拖拽）时重算省略
             this.resizeObserver = new ResizeObserver(() => {
-                if (!this.nativeBar?.isConnected) {
-                    return;
-                }
-                applyBreadcrumbEllipsis(this.nativeBar);
+                this.scheduleBreadcrumbEllipsis();
             });
             this.resizeObserver.observe(this.host);
         } else {
@@ -245,6 +275,23 @@ export class InlineBreadcrumbController {
 
         this.bindEvents();
         return true;
+    }
+
+    /**
+     * ResizeObserver 回调在 layout 之后触发，连续拖拽分屏时每帧都会触发；
+     * 这里用 rAF 合并为每帧最多一次，避免同一帧内重复的强制布局。
+     */
+    scheduleBreadcrumbEllipsis() {
+        if (this.resizeFrame !== 0 || !this.nativeBar?.isConnected) {
+            return;
+        }
+        this.resizeFrame = requestAnimationFrame(() => {
+            this.resizeFrame = 0;
+            if (!this.nativeBar?.isConnected) {
+                return;
+            }
+            applyBreadcrumbEllipsis(this.nativeBar);
+        });
     }
 
     bindEvents() {
@@ -645,6 +692,10 @@ export class InlineBreadcrumbController {
 
     destroy() {
         this.revision += 1;
+        if (this.resizeFrame !== 0) {
+            cancelAnimationFrame(this.resizeFrame);
+            this.resizeFrame = 0;
+        }
         this.contentObserver?.disconnect();
         this.resizeObserver?.disconnect();
         this.abortController.abort();
