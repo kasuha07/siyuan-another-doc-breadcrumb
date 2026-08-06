@@ -162,7 +162,27 @@ export async function openRelativeMenu({ protyle, anchorElement, parentId, nextI
     // 占位标记：getChildDocuments 为异步，期间若用户再次触发其他菜单，
     // 后打开的调用会覆盖此占位；await 结束后凭 id 比对决定是否放弃本次打开，
     // 避免多个 openRelativeMenu 并发操作共享的 #commonMenu 相互清空。
+    // 加载期间点击菜单外部（如文档正文）也会取消本次打开（见下方 mousedown 捕获监听）。
     state.g_relativeMenu = { "menu": null, "id": id };
+
+    // 加载期点击外部取消本次打开：占位期间菜单尚未渲染，closeCB 不会触发，若不加处理，
+    // await 完成后菜单会凭 id 校验通过而“凭空”弹出。捕获阶段一次性监听确保任何 mousedown
+    // （含菜单外点击）先于目标元素处理执行；点击仍在触发锚点内（连点重开）时不处理，
+    // 保留 guardMenuOpen 的去重语义。所有出口（成功/失败/放弃）统一调用 cleanup 移除监听，避免泄漏。
+    const cleanupOutsideClick = () => {
+        document.removeEventListener("mousedown", onOutsideMousedown, true);
+        // 仅在占位仍属于本次打开时置 null，避免误清其他菜单的占位
+        if (state.g_relativeMenu && state.g_relativeMenu["id"] === id && state.g_relativeMenu["menu"] === null) {
+            state.g_relativeMenu = null;
+        }
+    };
+    const onOutsideMousedown = (event: any) => {
+        if (anchorElement.contains(event.target)) {
+            return;
+        }
+        cleanupOutsideClick();
+    };
+    document.addEventListener("mousedown", onOutsideMousedown, true);
 
     let siblings: any[] = [];
 
@@ -179,17 +199,16 @@ export async function openRelativeMenu({ protyle, anchorElement, parentId, nextI
         }
     } catch (err) {
         errorPush(err);
-        if (state.g_relativeMenu && state.g_relativeMenu["id"] === id) {
-            state.g_relativeMenu = null;
-        }
+        cleanupOutsideClick();
         return;
     }
     // 加载期间已有更新的菜单被打开，放弃本次打开
     if (!state.g_relativeMenu || state.g_relativeMenu["id"] !== id) {
+        cleanupOutsideClick();
         return;
     }
     if (siblings.length <= 0) {
-        state.g_relativeMenu = null;
+        cleanupOutsideClick();
         return;
     }
 
@@ -289,6 +308,222 @@ export async function openRelativeMenu({ protyle, anchorElement, parentId, nextI
         }
     }, 3);
     saveLastMenu(tempMenu, id);
+    // 菜单已成功打开，移除加载期的外部点击监听；占位已转为真实菜单，后续由 menuCloseCB 清理
+    cleanupOutsideClick();
+}
+
+/**
+ * 从 DOM 结构计算菜单项嵌套深度（首层=1，每遇到一层 .b3-menu__submenu 祖先 +1）。
+ * 容器级 observer/事件委托会观察到后续动态创建的子菜单项，深度不能依赖闭包计数，
+ * 必须实时从 DOM 计算。
+ */
+function getMenuItemDepth(menuItemElement: Element): number {
+    let depth = 1;
+    let parent = menuItemElement.parentElement;
+    while (parent) {
+        if (parent.classList.contains('b3-menu__submenu')) {
+            depth++;
+        }
+        parent = parent.parentElement;
+    }
+    return depth;
+}
+
+/**
+ * 懒加载子菜单统一入口（鼠标悬停与键盘展开 --show 类变化共用）。
+ * item 为带 data-has-children="true" 的标记元素，docId/path/box 均从 data 属性读取；
+ * menuItemElement 为所属 .b3-menu__item。加载成功填充 submenuContainer 并递归注册子容器监听；
+ * 失败重置 data-loaded 允许移开鼠标后重试，并给出可见提示。
+ */
+async function loadSubmenu(item: Element, menuItemElement: Element, maxDepth: number, protyleElem: HTMLElement) {
+    const docId = item.getAttribute('data-doc-id')!;
+    const path = item.getAttribute('data-path')!;
+    const box = item.getAttribute('data-box')!;
+    const isLoaded = item.getAttribute('data-loaded') === 'true';
+    const currentDepth = getMenuItemDepth(menuItemElement);
+
+    if (isLoaded || currentDepth >= maxDepth) return;
+
+    // 避免多次处理
+    item.setAttribute('data-loaded', 'true');
+
+    const submenuContainer = menuItemElement.querySelector('.b3-menu__submenu .b3-menu__items');
+    if (!submenuContainer) return;
+
+    submenuContainer.innerHTML = '';
+
+    let childDocuments: any[];
+    const cacheKey = `${box}|${path}`;
+    const cached = submenuCache.get(cacheKey);
+    if (cached) {
+        childDocuments = cached;
+    } else {
+        try {
+            // 加载子文档
+            const sqlResult = [{ path, box }];
+            childDocuments = await getChildDocuments(docId, sqlResult);
+            submenuCache.set(cacheKey, childDocuments);
+        } catch (err) {
+            // 加载失败（网络/kernel 错误、文档已删除等）：重置标记允许移开鼠标后重试，并给出可见提示
+            errorPush(err);
+            item.setAttribute('data-loaded', 'false');
+            if (menuItemElement.isConnected) {
+                submenuContainer.innerHTML = `<button class="b3-menu__item" disabled><span class="b3-menu__label">${state.language["loadFailed"] ?? state.language["no_doc"]}</span></button>`;
+            }
+            return;
+        }
+    }
+
+    // 加载期间菜单已被关闭（#commonMenu 被其他菜单复用，内容已清空），放弃填充
+    if (!menuItemElement.isConnected) {
+        return;
+    }
+
+    if (!childDocuments || childDocuments.length === 0) {
+        submenuContainer.innerHTML = `<button class="b3-menu__item" disabled><span class="b3-menu__label">${state.language["no_doc"]}</span></button>`;
+        return;
+    }
+
+    // 创建子文档菜单项（与首层级菜单一致：受“在文档菜单中显示新建文档按钮”设置项控制）
+    if (state.g_setting.createDocBtnInMenu && !isCreateDocDepthLimited(path)) {
+        // Menu Item
+        const menuItemEl = document.createElement('button');
+        menuItemEl.className = 'b3-menu__item';
+        // icon
+        const iconAddEl = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        iconAddEl.classList.add('b3-menu__icon');
+        iconAddEl.innerHTML = `<use xlink:href="#iconAdd"></use>`;
+        menuItemEl.appendChild(iconAddEl);
+
+        // label
+        const labelEl = document.createElement('span');
+        labelEl.className = 'b3-menu__label';
+
+        // title
+        const docTitleEl = document.createElement('span');
+        docTitleEl.className = `${CONSTANTS.MENU_ITEM_CLASS_NAME}`;
+        docTitleEl.textContent = window.siyuan.languages!.newFile;
+        labelEl.appendChild(docTitleEl);
+        menuItemEl.appendChild(labelEl);
+        submenuContainer.appendChild(menuItemEl);
+        menuItemEl.addEventListener('click', (event: any) => {
+            event.preventDefault();
+            event.stopImmediatePropagation();
+            event.stopPropagation();
+            // 先关闭菜单并清理状态，再异步创建
+            state.g_relativeMenu["menu"]?.close();
+            state.g_relativeMenu = null;
+            createAndOpenEmptyDocAt(box, path);
+        });
+    }
+
+    // 子文档菜单
+    for (const childDoc of childDocuments) {
+        const docName = trimListDocsByPathAPIReturnedDocName(childDoc.name);
+        const trimedName = state.g_setting.nameMaxLength > 0 && docName.length > state.g_setting.nameMaxLength ?
+            docName.substring(0, state.g_setting.nameMaxLength) + "..." :
+            docName;
+        const hasChildren = childDoc.subFileCount > 0 && (currentDepth + 1) < maxDepth;
+
+        // Menu Item
+        const menuItemEl = document.createElement('button');
+        menuItemEl.className = 'b3-menu__item';
+        if (hasChildren) {
+            menuItemEl.classList.add('b3-menu__item--custom');
+        }
+
+        // Emoji
+        const emojiEl = document.createElement('span');
+        emojiEl.className = 'og-fdb-menu-emojitext';
+        emojiEl.innerHTML = getEmojiHtmlStr(childDoc.icon, childDoc.subFileCount > 0);
+        menuItemEl.appendChild(emojiEl);
+
+        // label
+        const labelEl = document.createElement('span');
+        labelEl.className = 'b3-menu__label';
+
+        // title
+        const docTitleEl = document.createElement('span');
+        docTitleEl.className = `${CONSTANTS.MENU_ITEM_CLASS_NAME}`;
+        docTitleEl.setAttribute('data-doc-id', childDoc.id);
+        docTitleEl.setAttribute('title', docName);
+
+        if (hasChildren) {
+            docTitleEl.setAttribute('data-has-children', 'true');
+            docTitleEl.setAttribute('data-path', childDoc.path || '');
+            docTitleEl.setAttribute('data-box', box);
+            docTitleEl.setAttribute('data-loaded', 'false');
+        }
+
+        docTitleEl.textContent = decodeHtmlEntities(trimedName);
+        labelEl.appendChild(docTitleEl);
+        menuItemEl.appendChild(labelEl);
+
+        // 子文档的子文档
+        if (hasChildren) {
+            // > icon
+            // svg里的use，使用带namespace的才能够正确创建一个有效的use箭头
+            const svgNS = 'http://www.w3.org/2000/svg';
+
+            const arrowIcon = document.createElementNS(svgNS, 'svg');
+            arrowIcon.setAttribute('class', 'b3-menu__icon b3-menu__icon--small');
+
+            const use = document.createElementNS(svgNS, 'use');
+            use.setAttributeNS('http://www.w3.org/1999/xlink', 'xlink:href', '#iconRight');
+
+            arrowIcon.appendChild(use);
+            menuItemEl.appendChild(arrowIcon);
+
+            // 子文档容器
+            const submenuDiv = document.createElement('div');
+            submenuDiv.className = 'b3-menu__submenu';
+
+            const submenuItems = document.createElement('div');
+            submenuItems.className = 'b3-menu__items';
+
+            // 加载中……
+            const loadingItem = document.createElement('button');
+            loadingItem.className = 'b3-menu__item';
+            loadingItem.disabled = true;
+            loadingItem.innerHTML = '<span class="b3-menu__label">Loading...</span>';
+            submenuItems.appendChild(loadingItem);
+
+            submenuDiv.appendChild(submenuItems);
+            menuItemEl.appendChild(submenuDiv);
+        }
+        menuItemEl.addEventListener('click', (event: any) => {
+            const docId = docTitleEl.getAttribute('data-doc-id');
+            event.preventDefault();
+            event.stopImmediatePropagation();
+            event.stopPropagation();
+            openRefLinkByAPI({
+                paramDocId: docId,
+                keyParam: {
+                    ctrlKey: event?.ctrlKey,
+                    shiftKey: event?.shiftKey,
+                    altKey: event?.altKey,
+                    metaKey: event?.metaKey,
+                },
+            });
+            // 手动绑定的不能触发菜单关闭，这里自行处理一下
+            state.g_relativeMenu["menu"]?.close();
+            state.g_relativeMenu = null;
+        });
+        submenuContainer.appendChild(menuItemEl);
+    }
+
+    // 对子Menu再度绑定（每个容器一个 observer，深度由 getMenuItemDepth 实时计算）
+    addLazyLoadEventListeners(submenuContainer, maxDepth, protyleElem);
+
+    // 内容填充完成且子菜单正处于展开状态时重新定位：原生 showSubMenu 在
+    // hover 时基于“Loading...”占位（宽高为 0）定位，水平方向恒选右侧、
+    // 垂直方向可能贴底，填充后尺寸已变化，需按真实尺寸重新计算
+    if (menuItemElement.classList.contains('b3-menu__item--show')) {
+        const subMenuElement = menuItemElement.querySelector(':scope > .b3-menu__submenu') as HTMLElement;
+        if (subMenuElement) {
+            window.siyuan.menus?.menu?.showSubMenu(subMenuElement);
+        }
+    }
 }
 
 /**
@@ -296,216 +531,45 @@ export async function openRelativeMenu({ protyle, anchorElement, parentId, nextI
  * @param {HTMLElement} menuElement 菜单元素
  * @param {number} maxDepth 最大深度
  * @param {HTMLElement} protyleElem protyle Elem
- * @param {number} currentDepth 层级深度
  */
-export function addLazyLoadEventListeners(menuElement: Element, maxDepth: number, protyleElem: HTMLElement, currentDepth = 1) {
-    // 仅针对未加载的进行处理
-    const menuItems = menuElement.querySelectorAll('.b3-menu__item [data-has-children="true"][data-loaded="false"]');
+export function addLazyLoadEventListeners(menuElement: Element, maxDepth: number, protyleElem: HTMLElement) {
+    // 仅针对未加载的进行处理；空容器不注册监听
+    if (menuElement.querySelectorAll('.b3-menu__item [data-has-children="true"][data-loaded="false"]').length === 0) {
+        return;
+    }
 
-    menuItems.forEach(item => {
-        const menuItemElement = item.closest('.b3-menu__item');
-        if (!menuItemElement) return;
+    // 统一的懒加载查找入口：鼠标悬停与键盘展开（--show 类变化）共用。
+    // :scope > .b3-menu__label 限定直接子级 label，避免误命中子菜单 .b3-menu__submenu 内的项
+    const loadFromMenuItem = (menuItemElement: Element) => {
+        const markElement = menuItemElement.querySelector(':scope > .b3-menu__label [data-has-children="true"][data-loaded="false"]');
+        if (markElement) {
+            loadSubmenu(markElement, menuItemElement, maxDepth, protyleElem);
+        }
+    };
 
-        // 统一的懒加载逻辑：鼠标悬停与键盘展开（--show 类变化）共用
-        const loadSubmenu = async () => {
-            const docId = item.getAttribute('data-doc-id')!;
-            const path = item.getAttribute('data-path')!;
-            const box = item.getAttribute('data-box')!;
-            const isLoaded = item.getAttribute('data-loaded') === 'true';
-
-            if (isLoaded || currentDepth >= maxDepth) return;
-
-            // 避免多次处理
-            item.setAttribute('data-loaded', 'true');
-
-            const submenuContainer = menuItemElement.querySelector('.b3-menu__submenu .b3-menu__items');
-            if (!submenuContainer) return;
-
-            submenuContainer.innerHTML = '';
-
-            let childDocuments: any[];
-            const cacheKey = `${box}|${path}`;
-            const cached = submenuCache.get(cacheKey);
-            if (cached) {
-                childDocuments = cached;
-            } else {
-                try {
-                    // 加载子文档
-                    const sqlResult = [{ path, box }];
-                    childDocuments = await getChildDocuments(docId, sqlResult);
-                    submenuCache.set(cacheKey, childDocuments);
-                } catch (err) {
-                    // 加载失败（网络/kernel 错误、文档已删除等）：重置标记允许移开鼠标后重试，并给出可见提示
-                    errorPush(err);
-                    item.setAttribute('data-loaded', 'false');
-                    if (menuItemElement.isConnected) {
-                        submenuContainer.innerHTML = `<button class="b3-menu__item" disabled><span class="b3-menu__label">${state.language["loadFailed"] ?? state.language["no_doc"]}</span></button>`;
-                    }
-                    return;
-                }
-            }
-
-            // 加载期间菜单已被关闭（#commonMenu 被其他菜单复用，内容已清空），放弃填充
-            if (!menuItemElement.isConnected) {
-                return;
-            }
-
-            if (!childDocuments || childDocuments.length === 0) {
-                submenuContainer.innerHTML = `<button class="b3-menu__item" disabled><span class="b3-menu__label">${state.language["no_doc"]}</span></button>`;
-                return;
-            }
-
-            // 创建子文档菜单项（与首层级菜单一致：受“在文档菜单中显示新建文档按钮”设置项控制）
-            if (state.g_setting.createDocBtnInMenu && !isCreateDocDepthLimited(path)) {
-                // Menu Item
-                const menuItemEl = document.createElement('button');
-                menuItemEl.className = 'b3-menu__item';
-                // icon
-                const iconAddEl = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-                iconAddEl.classList.add('b3-menu__icon');
-                iconAddEl.innerHTML = `<use xlink:href="#iconAdd"></use>`;
-                menuItemEl.appendChild(iconAddEl);
-
-                // label
-                const labelEl = document.createElement('span');
-                labelEl.className = 'b3-menu__label';
-
-                // title
-                const docTitleEl = document.createElement('span');
-                docTitleEl.className = `${CONSTANTS.MENU_ITEM_CLASS_NAME}`;
-                docTitleEl.textContent = window.siyuan.languages!.newFile;
-                labelEl.appendChild(docTitleEl);
-                menuItemEl.appendChild(labelEl);
-                submenuContainer.appendChild(menuItemEl);
-                menuItemEl.addEventListener('click', (event: any) => {
-                    event.preventDefault();
-                    event.stopImmediatePropagation();
-                    event.stopPropagation();
-                    // 先关闭菜单并清理状态，再异步创建
-                    state.g_relativeMenu["menu"]?.close();
-                    state.g_relativeMenu = null;
-                    createAndOpenEmptyDocAt(box, path);
-                });
-            }
-
-            // 子文档菜单
-            for (const childDoc of childDocuments) {
-                const docName = trimListDocsByPathAPIReturnedDocName(childDoc.name);
-                const trimedName = state.g_setting.nameMaxLength > 0 && docName.length > state.g_setting.nameMaxLength ?
-                    docName.substring(0, state.g_setting.nameMaxLength) + "..." :
-                    docName;
-                const hasChildren = childDoc.subFileCount > 0 && (currentDepth + 1) < maxDepth;
-
-                // Menu Item
-                const menuItemEl = document.createElement('button');
-                menuItemEl.className = 'b3-menu__item';
-                if (hasChildren) {
-                    menuItemEl.classList.add('b3-menu__item--custom');
-                }
-
-                // Emoji
-                const emojiEl = document.createElement('span');
-                emojiEl.className = 'og-fdb-menu-emojitext';
-                emojiEl.innerHTML = getEmojiHtmlStr(childDoc.icon, childDoc.subFileCount > 0);
-                menuItemEl.appendChild(emojiEl);
-
-                // label
-                const labelEl = document.createElement('span');
-                labelEl.className = 'b3-menu__label';
-
-                // title
-                const docTitleEl = document.createElement('span');
-                docTitleEl.className = `${CONSTANTS.MENU_ITEM_CLASS_NAME}`;
-                docTitleEl.setAttribute('data-doc-id', childDoc.id);
-                docTitleEl.setAttribute('title', docName);
-
-                if (hasChildren) {
-                    docTitleEl.setAttribute('data-has-children', 'true');
-                    docTitleEl.setAttribute('data-path', childDoc.path || '');
-                    docTitleEl.setAttribute('data-box', box);
-                    docTitleEl.setAttribute('data-loaded', 'false');
-                }
-
-                docTitleEl.textContent = decodeHtmlEntities(trimedName);
-                labelEl.appendChild(docTitleEl);
-                menuItemEl.appendChild(labelEl);
-
-                // 子文档的子文档
-                if (hasChildren) {
-                    // > icon
-                    // svg里的use，使用带namespace的才能够正确创建一个有效的use箭头
-                    const svgNS = 'http://www.w3.org/2000/svg';
-
-                    const arrowIcon = document.createElementNS(svgNS, 'svg');
-                    arrowIcon.setAttribute('class', 'b3-menu__icon b3-menu__icon--small');
-
-                    const use = document.createElementNS(svgNS, 'use');
-                    use.setAttributeNS('http://www.w3.org/1999/xlink', 'xlink:href', '#iconRight');
-
-                    arrowIcon.appendChild(use);
-                    menuItemEl.appendChild(arrowIcon);
-
-                    // 子文档容器
-                    const submenuDiv = document.createElement('div');
-                    submenuDiv.className = 'b3-menu__submenu';
-
-                    const submenuItems = document.createElement('div');
-                    submenuItems.className = 'b3-menu__items';
-
-                    // 加载中……
-                    const loadingItem = document.createElement('button');
-                    loadingItem.className = 'b3-menu__item';
-                    loadingItem.disabled = true;
-                    loadingItem.innerHTML = '<span class="b3-menu__label">Loading...</span>';
-                    submenuItems.appendChild(loadingItem);
-
-                    submenuDiv.appendChild(submenuItems);
-                    menuItemEl.appendChild(submenuDiv);
-                }
-                menuItemEl.addEventListener('click', (event: any) => {
-                    const docId = docTitleEl.getAttribute('data-doc-id');
-                    event.preventDefault();
-                    event.stopImmediatePropagation();
-                    event.stopPropagation();
-                    openRefLinkByAPI({
-                        paramDocId: docId,
-                        keyParam: {
-                            ctrlKey: event?.ctrlKey,
-                            shiftKey: event?.shiftKey,
-                            altKey: event?.altKey,
-                            metaKey: event?.metaKey,
-                        },
-                    });
-                    // 手动绑定的不能触发菜单关闭，这里自行处理一下
-                    state.g_relativeMenu["menu"]?.close();
-                    state.g_relativeMenu = null;
-                });
-                submenuContainer.appendChild(menuItemEl);
-            }
-
-            // 对子Menu再度绑定
-            addLazyLoadEventListeners(submenuContainer, maxDepth, protyleElem, currentDepth + 1);
-
-            // 内容填充完成且子菜单正处于展开状态时重新定位：原生 showSubMenu 在
-            // hover 时基于“Loading...”占位（宽高为 0）定位，水平方向恒选右侧、
-            // 垂直方向可能贴底，填充后尺寸已变化，需按真实尺寸重新计算
-            if (menuItemElement.classList.contains('b3-menu__item--show')) {
-                const subMenuElement = menuItemElement.querySelector(':scope > .b3-menu__submenu') as HTMLElement;
-                if (subMenuElement) {
-                    window.siyuan.menus?.menu?.showSubMenu(subMenuElement);
-                }
-            }
-        };
-
-        // 鼠标悬停触发懒加载
-        menuItemElement.addEventListener('mouseover', loadSubmenu);
-        // 键盘展开：原生 bindMenuKeydown 的 →/Enter 只添加 b3-menu__item--show 类并调用
-        // showSubMenu，不派发 mouseover；监听类变化以覆盖键盘路径（data-loaded 标记去重）
-        const showObserver = new MutationObserver(() => {
-            if (menuItemElement.classList.contains('b3-menu__item--show')) {
-                loadSubmenu();
-            }
-        });
-        showObserver.observe(menuItemElement, { attributes: true, attributeFilter: ['class'] });
+    // 鼠标悬停触发懒加载：容器级事件委托（mouseover 冒泡），从 event.target 定位菜单项；
+    // 相比每项一个监听，避免首层菜单项过多时创建大量监听器
+    menuElement.addEventListener('mouseover', (event: any) => {
+        const menuItemElement = event.target?.closest?.('.b3-menu__item');
+        if (menuItemElement) {
+            loadFromMenuItem(menuItemElement);
+        }
     });
+
+    // 键盘展开：原生 bindMenuKeydown 的 →/Enter 只添加 b3-menu__item--show 类并调用
+    // showSubMenu，不派发 mouseover；每个容器一个 MutationObserver 监听 subtree 类变化
+    // 以覆盖键盘路径（data-loaded 标记 + getMenuItemDepth 实时计算保证不重复加载）。
+    // 相比每项一个 observer，容器级避免首层菜单项过多时创建上千个观察器。
+    const showObserver = new MutationObserver((mutations) => {
+        for (const mutation of mutations) {
+            if (mutation.type === 'attributes' && mutation.attributeName === 'class' &&
+                (mutation.target as HTMLElement).classList.contains('b3-menu__item--show')) {
+                const menuItemElement = (mutation.target as HTMLElement).closest('.b3-menu__item');
+                if (menuItemElement) {
+                    loadFromMenuItem(menuItemElement);
+                }
+            }
+        }
+    });
+    showObserver.observe(menuElement, { subtree: true, attributes: true, attributeFilter: ['class'] });
 }

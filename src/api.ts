@@ -245,7 +245,7 @@ let lastClickTime_openRefLinkByAPI = 0;
  * @param paramDocId 如果没有指定 event，使用此参数作为文档id
  * @param keyParam 如果没有event，使用此次数指定ctrlKey后台打开、shiftKey下方打开、altKey右侧打开
  * @param openInFocus 是否以聚焦块的方式打开（此参数有变动）
- * @param removeCurrentTab 是否移除当前Tab
+ * @param removeCurrentTab 透传给思源 openTab，真实语义为“是否移除 unupdate（未初始化）占位页签”——不传（undefined）时思源默认 true（移除占位页签），显式传 false 会覆盖思源默认（保留占位页签）。与下方 afterOpen 中插件手动关闭旧页签（removeCurrentTabF）是两套独立机制
  * @param autoRemoveJudgeMiliseconds 自动判断是否移除当前Tab的时间间隔（0则 不自动判断）
  * @param preventDefault {boolean} 控制是否禁止默认行为以及冒泡操作；如果在菜单中，请在调用前禁止冒泡和默认行为；另外，也可充当是否在当前聚焦窗口打开的控制（false，则在面包屑所在文档打开）
  * @param action 打开文档时携带的 ProtyleAction 列表，默认 [CB_GET_SCROLL]；新建文档应传 [CB_GET_CONTEXT, CB_GET_OPENNEW] 与官方行为一致
@@ -311,7 +311,9 @@ export function openRefLinkByAPI({ mouseEvent, paramDocId = "", keyParam = {}, o
         },
         position: positionKey,
         keepCursor: isEventCtrlKey(keyParam) ? true : undefined,
-        removeCurrentTab: removeCurrentTab, // 目前这个选项的行为是：true，则当前页签打开；false，则根据思源设置：新页签打开
+        removeCurrentTab: removeCurrentTab, // 透传思源 openTab：真实语义为“是否移除 unupdate（未初始化）占位页签”——
+        // 不传（undefined）时思源默认 true（移除占位页签）；显式传 false 会覆盖思源默认（保留占位页签）。
+        // 与下方 afterOpen 中插件手动关闭旧页签（removeCurrentTabF）是两套独立机制
     };
     // 后台打开页签不可移除。用 afterOpen 回调关闭旧页签：openTab 内部先异步
     // 获取块信息再创建新页签，若提前同步关闭旧页签，分屏仅剩一个页签时
@@ -345,42 +347,35 @@ export function removeCurrentTabF(docId: string | null) {
         debugPush("错误的id或多个匹配id");
         return;
     }
-    // v3.1.11或以上
-    if (siyuan?.getAllEditor) {
-        const editor = siyuan.getAllEditor();
-        let protyle: any = null;
-        for (let i = 0; i < editor.length; i++) {
-            if (editor[i].protyle.block.rootID === docId) {
-                protyle = editor[i].protyle;
-                break;
-            }
-        }
-        if (protyle) {
-            if (protyle.model.headElement) {
-                if (protyle.model.headElement.classList.contains("item--pin")) {
-                    debugPush("Pin页面，不关闭存在页签");
-                    return;
-                }
-            }
-            // 未文档化的布局内部链：protyle.model.parent = Tab（页签）、Tab.parent = Wnd（页签容器），
-            // Wnd.removeTab(id, isBatchClose=false, animate=false, isSaveLayout=true) 为布局公开方法
-            // （app/src/layout/Wnd.ts v3.7.3；SDK 类型声明 layout/Model.d.ts、Tab.d.ts、Wnd.d.ts 可见，
-            // 但 API 文档未说明此用法）。思源自身同款写法：item.parent.parent.removeTab(item.parent.id)
-            // （app/src/layout/dock/util.ts）。移动端 model.parent 为 null，但移动端入口已提前返回。
-            // 若升级后此链断裂，仅表现为“页签不关闭”的软失效；此处做存在性检查并告警，避免静默。
-            const tabContainer = protyle?.model?.parent?.parent;
-            const tabId = protyle.model?.parent?.id;
-            if (typeof tabContainer?.removeTab !== "function" || !tabId) {
-                warnPush("移除页签链失效：model.parent.parent.removeTab 不可用，跳过关闭（思源可能移除了该内部结构）");
+    // 基于公开 API 定位已初始化页签：siyuan.getAllTabs() 返回 Tab[]，按文档 id 匹配；
+    // 未初始化页签的 model 为 null，可选链跳过。
+    if (siyuan?.getAllTabs) {
+        const tabs = siyuan.getAllTabs();
+        // 运行时 tab.model 对编辑器页签为 Editor 实例（SDK 声明 Editor extends Model，公开 editor: Protyle 字段），
+        // 其 editor.protyle 为 IProtyle，block.rootID 即文档 id（思源自身同款写法：tab.model.editor.protyle.block.rootID，
+        // app/src/layout/tabUtil.ts）。类型层面 Tab.model 仅声明为 Model（无 protyle 字段），此处按公开结构最小收窄。
+        const matchedTab = tabs.find(tab =>
+            (tab.model as { editor?: { protyle?: { block?: { rootID?: string } } } } | null)?.editor?.protyle?.block?.rootID === docId);
+        if (matchedTab) {
+            if (matchedTab.headElement?.classList.contains("item--pin")) {
+                debugPush("Pin页面，不关闭存在页签");
                 return;
             }
-            debugPush("关闭存在页签", tabContainer, tabId);
-            tabContainer.removeTab(tabId, false, false);
+            // 公开结构：Tab.parent 为所属 Wnd（页签容器），Wnd.removeTab(id, isBatchClose=false, animate=false,
+            // isSaveLayout=true) 为布局公开方法（SDK 类型声明 layout/Tab.d.ts、Wnd.d.ts 可见，与思源内核 Wnd.ts 一致）。
+            // 不再依赖 protyle→Tab（model.parent）的私有链。若升级后此结构失效，仅表现为“页签不关闭”的软失效；
+            // 此处做存在性检查并告警，避免静默。
+            if (typeof matchedTab.parent?.removeTab !== "function") {
+                warnPush("移除页签链失效：tab.parent.removeTab 不可用，跳过关闭（思源可能移除了该公开结构）");
+                return;
+            }
+            debugPush("关闭存在页签", matchedTab.parent, matchedTab.id);
+            matchedTab.parent.removeTab(matchedTab.id, false, false);
         } else {
-            debugPush("没有找到对应的protyle，不关闭存在的页签");
+            warnPush("没有找到匹配的页签，跳过关闭（目标文档页签可能尚未初始化）");
             return;
         }
-    } else { // v3.1.10或以下
+    } else { // 无 getAllTabs 的旧版本
         return;
     }
 
