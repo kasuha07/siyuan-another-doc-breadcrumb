@@ -665,7 +665,13 @@ export class InlineBreadcrumbController {
         // 内容指纹未变（典型：光标移块触发的重复刷新，模型与上次完全一致）：
         // 跳过整轮 DOM 重建与省略重算；若 root 已被思源重写清掉，
         // 由 MutationObserver 恢复路径用 cachedRoot 快照兜底。
-        const fingerprint = JSON.stringify(model);
+        // 指纹需并入仅影响渲染、不进模型的设置（相邻导航显示样式、文档名
+        // 最大长度、图标显示方式），否则这些设置保存后指纹不变、不会触发
+        // 重建，样式要等下次真实模型变化才生效。
+        const fingerprint = JSON.stringify(model)
+            + "|adjNavStyle=" + state.g_setting.adjacentNavStyle
+            + "|nameMaxLength=" + state.g_setting.nameMaxLength
+            + "|icon=" + state.g_setting.icon;
         if (fingerprint === this.lastFingerprint) {
             return;
         }
