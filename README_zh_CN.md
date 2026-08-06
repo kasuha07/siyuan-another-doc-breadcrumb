@@ -7,7 +7,7 @@
 > **分叉声明**：本插件是 [OpaqueGlass/syplugin-fakeDocBreadcrumb](https://github.com/OpaqueGlass/syplugin-fakeDocBreadcrumb) 的分叉，采用 [AGPL-3.0](LICENSE) 许可证。版权归 OpaqueGlass 所有，修改部分版权归霞葉（kasuha）。
 
 > 当前版本：v1.0.0
-> - 分家自 syplugin-fakeDocBreadcrumb v2.5.0，更名另起炉灶；
+> - 分家自 syplugin-fakeDocBreadcrumb v1.5.1，更名另起炉灶；
 >
 > 详见[更新日志](CHANGELOG.md)
 

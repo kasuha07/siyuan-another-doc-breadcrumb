@@ -2,14 +2,14 @@
 
 ### v1.0.0 (2026年8月6日)
 
-- 分家：自 OpaqueGlass/syplugin-fakeDocBreadcrumb v2.5.0 分叉，更名为 siyuan-another-doc-breadcrumb（另一个文档面包屑）；
+- 分家：自 OpaqueGlass/syplugin-fakeDocBreadcrumb v1.5.1 分叉，更名为 siyuan-another-doc-breadcrumb（另一个文档面包屑）；
 - 许可证：遵循上游 AGPL-3.0，保留完整 git 历史与版权声明；
 - 移除：对 OpaqueGlass 外部调试协议（`OpaqueGlassDebugV2`）的依赖；
 - 清理：代码与文案中的旧插件名全部替换为新名；
 
 ---
 
-## 上游历史（OpaqueGlass/syplugin-fakeDocBreadcrumb）
+## 更名前历史（kasuha07 分叉，沿用 syplugin-fakeDocBreadcrumb 旧名与 v2.x 版本号）
 
 ### v2.5.0 (2026年8月6日)
 
@@ -65,6 +65,10 @@
 - 异步：以 controller revision token 取代全局互斥锁，快速切换文档不再出现旧路径覆盖；
 - 生命周期：监听 `destroy-protyle` 事件，Protyle 销毁、插件卸载、设置切换后无残留节点；
 - 移除：v3.7.0 以前兼容分支、动态样式、旧版节点迁移清理、下线提示弹窗；
+
+---
+
+## 上游历史（OpaqueGlass/syplugin-fakeDocBreadcrumb，分家截至 v1.5.1）
 
 ### v1.5.1 (2026年7月28日)
 

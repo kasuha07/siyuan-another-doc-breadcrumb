@@ -4,7 +4,7 @@
 
 > A [SiYuan Note](https://github.com/siyuan-note/siyuan) plugin that displays the current document path information above the editor.
 
-> **Fork notice**: This is a fork of [OpaqueGlass/syplugin-fakeDocBreadcrumb](https://github.com/OpaqueGlass/syplugin-fakeDocBreadcrumb), licensed under [AGPL-3.0](LICENSE). Copyright © OpaqueGlass. Modifications © 霞葉 (kasuha07).
+> **Fork notice**: This is a fork of [OpaqueGlass/syplugin-fakeDocBreadcrumb](https://github.com/OpaqueGlass/syplugin-fakeDocBreadcrumb) (forked from v1.5.1), licensed under [AGPL-3.0](LICENSE). Copyright © OpaqueGlass. Modifications © 霞葉 (kasuha07).
 
 > Most of this document was translated by Google Translate and GPT.
 
