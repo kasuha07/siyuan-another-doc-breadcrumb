@@ -36,8 +36,13 @@ export function openHideMenu({ anchorElement, hiddenEntries }: any, event: any) 
     state.g_relativeMenu = null;
     // SDK Menu 构造时若 data-name 与传入 id 相同会进入 isOpen 静默失败态
     // （addItem/open 全部无效），同名菜单已打开时主动关闭，避免“再点一次菜单消失”
+    // 注意：window.siyuan.menus.menu 运行时是内核内部 Menu 实例（app/src/menus/Menu.ts），
+    // 只有 remove() 没有 SDK 包装类（app/src/plugin/Menu.ts）的 close()；siyuan 类型声明
+    // 误标为 SDK Menu（仅有 close() 无 remove()），与运行时相反，故需断言后调用 remove()。
+    // 否则二次点击抛 TypeError 菜单关不掉，且后续 new Menu("newMenu") 进入静默失败态
+    // （isOpen=true，构造时 remove() 清空菜单）导致菜单凭空消失
     if (document.querySelector("#commonMenu[data-name='newMenu']")) {
-        window.siyuan.menus?.menu?.close();
+        (window.siyuan.menus?.menu as any)?.remove();
         return;
     }
     const tempMenu = new Menu("newMenu");
