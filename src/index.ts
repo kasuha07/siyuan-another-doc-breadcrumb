@@ -25,7 +25,6 @@ import { CONSTANTS, g_setting_default } from "./constants";
 import { state } from "./state";
 import { debugPush, warnPush } from "./logger";
 import { generateSettingPanel, loadUISettings, SettingProperty } from "./settings";
-import { removeStyle, setStyle } from "./style";
 import { destroyAllControllers } from "./controller";
 import { removeAdjacentTooltip } from "./adjacent";
 import { eventBusHandler, handleDestroyProtyle, mainEventBusHander, refreshAllShowingProtyles, resetEventState } from "./events";
@@ -54,6 +53,30 @@ function normalizeSettingCache(raw: any): { [key: string]: any } | null {
 }
 
 /**
+ * 键级类型校验：剔除类型不合法（含历史坏数据）的设置键。
+ * 场景：旧版 loadUISettings 对空输入 parseFloat 得 NaN，JSON.stringify
+ * 序列化为 null 写盘；加载后 null 参与 slice(0, null) 等隐式转换会把子文档
+ * 列表清空（api.ts getChildDocs）。被剔除的键不写入返回对象，由调用方以
+ * 默认值兜底。
+ */
+function sanitizeSettingCache(raw: { [key: string]: any }): { [key: string]: any } {
+    const cleaned: { [key: string]: any } = {};
+    for (const [key, defaultValue] of Object.entries(g_setting_default)) {
+        const value = raw[key];
+        if (value === undefined) {
+            continue;
+        }
+        const valid = typeof defaultValue === "number"
+            ? typeof value === "number" && Number.isFinite(value)
+            : typeof value === typeof defaultValue;
+        if (valid) {
+            cleaned[key] = value;
+        }
+    }
+    return cleaned;
+}
+
+/**
  * Plugin类
  */
 export class FakeDocBreadcrumb extends Plugin {
@@ -66,9 +89,9 @@ export class FakeDocBreadcrumb extends Plugin {
         state.g_pluginInstance = this;
         // 读取配置
         Object.assign(state.g_setting, g_setting_default);
-        if (isSomePluginExist(this.app.plugins, CONSTANTS.MULTILINE_CONFLICT_PLUGINS)) {
-            state.g_setting.oneLineBreadcrumb = true;
-        }
+        // 冲突插件强制同行模式（onload 早期应用一次，配置加载/保存后由
+        // applyConflictPluginOverride 再次强制，防止被磁盘配置绕过）
+        this.applyConflictPluginOverride();
 
         state.g_writeStorage = this.saveData;
 
@@ -80,14 +103,14 @@ export class FakeDocBreadcrumb extends Plugin {
     }
 
     /**
-     * 布局就绪后的初始化：加载配置 → 应用配置 → 注册事件 → 注入样式。
+     * 布局就绪后的初始化：加载配置 → 应用配置 → 注册事件。
      *
      * 失败点与重试：官方 loadData 在 HTTP 4xx / Abort / 网络异常时可能永不回调
      * （Promise 悬空），loadSettingCache 已用超时兜底 resolve null；配置加载失败
      * （超时/无效）时按固定间隔重试整个加载流程（最多 INIT_RETRY_MAX 次），
      * 而不是只重试一次。全部失败则回退默认配置继续运行；
-     * 事件注册与样式注入无论配置是否加载成功都只执行一次（重复注册会导致
-     * 事件总线收到双份消息）。
+     * 事件注册无论配置是否加载成功都只执行一次（重复注册会导致
+     * 事件总线收到双份消息）。样式由官方 pluginsStyle{name} 机制注入，无需处理。
      */
     async initialize() {
         let settingCache: { [key: string]: any } | null = null;
@@ -104,35 +127,55 @@ export class FakeDocBreadcrumb extends Plugin {
         if (settingCache != null) {
             // 解析并载入配置（settingCache 已通过 normalizeSettingCache 校验为纯对象）
             debugPush("载入配置中", settingCache);
-            let resetFlag = false;
-            if (settingCache["@version"]) {
-                if (settingCache["@version"] < g_setting_default["@version"]) {
-                    debugPush("配置版本过旧");
-                    resetFlag = true;
+            // 版本迁移：旧配置以默认值为底合并已知键，只做字段级迁移，
+            // 不整表重置，用户自定义设置全部保留；迁移后写盘补全版本号。
+            // 迁移先于键级校验执行：旧版 showAdjacentDocButton 是布尔值，
+            // 需先转换为新枚举，否则会被按当前 string 类型误判为非法剔除
+            let migrated = false;
+            if (settingCache["@version"] === undefined || settingCache["@version"] < g_setting_default["@version"]) {
+                const merged: { [key: string]: any } = { ...g_setting_default };
+                for (const key of Object.keys(g_setting_default)) {
+                    if (key in settingCache && settingCache[key] !== undefined) {
+                        merged[key] = settingCache[key];
+                    }
                 }
-            } else if (settingCache["@version"] === undefined) {
-                resetFlag = true;
+                // 旧版本 showAdjacentDocButton 为布尔开关：true→同级、false→不显示
+                if (typeof merged["showAdjacentDocButton"] === "boolean") {
+                    merged["showAdjacentDocButton"] = merged["showAdjacentDocButton"] ? CONSTANTS.ADJ_SAME_LEVEL : CONSTANTS.ADJ_NONE;
+                }
+                merged["@version"] = g_setting_default["@version"];
+                settingCache = merged;
+                migrated = true;
+                debugPush("配置版本迁移完成", settingCache);
             }
-            if (resetFlag) {
-                settingCache["@version"] = g_setting_default["@version"];
-                if (settingCache["showAdjacentDocButton"] === true) {
-                    settingCache["showAdjacentDocButton"] = CONSTANTS.ADJ_SAME_LEVEL;
-                } else if (settingCache["showAdjacentDocButton"] === false) {
-                    settingCache["showAdjacentDocButton"] = CONSTANTS.ADJ_NONE;
-                }
+            // 键级校验：剔除类型非法的键（含历史 NaN→null 坏数据），缺失键由默认值兜底
+            settingCache = sanitizeSettingCache(settingCache);
+            debugPush("载入配置", settingCache);
+            Object.assign(state.g_setting, settingCache);
+            // 冲突插件强制同行模式：磁盘配置可能存了 false，合并后重新强制
+            this.applyConflictPluginOverride();
+            if (migrated) {
                 this.saveData(`settings.json`, JSON.stringify(settingCache)).catch((e) => {
                     warnPush("配置迁移写盘失败", e);
                 });
             }
-            debugPush("载入配置", settingCache);
-            Object.assign(state.g_setting, settingCache);
         } else {
             warnPush("无有效配置文件，本次使用默认配置");
         }
         // 事件注册不依赖配置加载成败：配置缺失或异常时以默认值继续运行，绝不静默死亡
         this.eventBusInnerHandler();
-        removeStyle();
-        setStyle();
+    }
+
+    /**
+     * 冲突插件强制同行模式：toolbar-plus 等插件与两行模式布局冲突，
+     * 冲突插件存在时无论磁盘配置或设置面板选择如何，都强制
+     * oneLineBreadcrumb=true。在 onload、配置加载合并后与保存回调三处应用，
+     * 防止被 loadData 合并与保存写入绕过。
+     */
+    applyConflictPluginOverride() {
+        if (isSomePluginExist(this.app.plugins, CONSTANTS.MULTILINE_CONFLICT_PLUGINS)) {
+            state.g_setting.oneLineBreadcrumb = true;
+        }
     }
 
     /**
@@ -172,7 +215,7 @@ export class FakeDocBreadcrumb extends Plugin {
             elem.classList.remove(CONSTANTS.HOST_STATE_CLASS_NAME);
         });
         (this as any).el && (this as any).el.remove();
-        removeStyle();
+        // 样式由官方 pluginsStyle{name} 机制托管，卸载时由思源 uninstall 移除，无需自管
         this.offEventBusInnerHander();
     }
 
@@ -197,15 +240,21 @@ export class FakeDocBreadcrumb extends Plugin {
             actionButtons[1].addEventListener("click", () => {
                 debugPush('SAVING');
                 let uiSettings = loadUISettings(settingForm);
-                if (isSomePluginExist(this.app.plugins, CONSTANTS.MULTILINE_CONFLICT_PLUGINS) && uiSettings.oneLineBreadcrumb == false) {
+                if (isSomePluginExist(this.app.plugins, CONSTANTS.MULTILINE_CONFLICT_PLUGINS)) {
+                    // 冲突插件存在时强制同行模式：写盘值一并强制为 true，
+                    // 避免下次加载时被磁盘 false 覆盖冲突强制值
+                    uiSettings.oneLineBreadcrumb = true;
                     showMessage(`${state.language["conflict_plugin_oneline_breadcrumb"]}<br/> ——[${this.name}]`, 13000);
                 }
                 this.saveData(`settings.json`, JSON.stringify(uiSettings));
+                const prevOneLine = state.g_setting.oneLineBreadcrumb;
                 Object.assign(state.g_setting, uiSettings);
-                removeStyle();
-                setStyle();
-                // 销毁全部 presentation，以新设置重新挂载
-                destroyAllControllers();
+                this.applyConflictPluginOverride();
+                // 仅同行/两行切换需要销毁重建挂载结构，其余设置由 refresh
+                // 按模型指纹变化重建内容；样式已由官方机制托管，无需重注入
+                if (state.g_setting.oneLineBreadcrumb !== prevOneLine) {
+                    destroyAllControllers();
+                }
                 refreshAllShowingProtyles();
                 debugPush("SAVED");
                 settingDialog.destroy();

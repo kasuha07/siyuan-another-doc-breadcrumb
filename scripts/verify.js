@@ -68,3 +68,11 @@ if (typeof entry !== 'function' && typeof entry !== 'object') {
     process.exit(1);
 }
 console.log('OK: 入口导出 =', entry.name || '(class)');
+
+// 验证样式产物：思源内核只读取插件目录 index.css 并注入 #pluginsStyle{name}
+// （见 kernel/model/plugin.go loadPetals 与 app/src/plugin/loader.ts insertPluginCSS）
+if (!fs.existsSync(path.join(distDir, 'index.css'))) {
+    console.error('FAIL: dist 缺少 index.css（思源内核仅读取该文件注入插件样式）');
+    process.exit(1);
+}
+console.log('OK: dist/index.css 存在');

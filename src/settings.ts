@@ -1,7 +1,7 @@
 /**
  * 设置面板构建与读取
  */
-import { CONSTANTS } from "./constants";
+import { CONSTANTS, g_setting_default } from "./constants";
 import { debugPush, logPush } from "./logger";
 import { state } from "./state";
 
@@ -209,7 +209,14 @@ export function loadUISettings(formElement: HTMLFormElement) {
         let maxValue = numberElement.getAttribute("max");
         let value = parseFloat(numberElement.value);
 
-        if (minValue !== null && value < parseFloat(minValue)) {
+        if (!Number.isFinite(value)) {
+            // 空输入/非法字符时 parseFloat 得 NaN，JSON.stringify 会把 NaN
+            // 序列化为 null 写盘；加载后 null 参与 slice(0, null) 等隐式转换
+            // 会把子文档列表清空（api.ts getChildDocs）。回退该设置的默认值，
+            // 并回写输入框让用户看到实际生效的值
+            value = g_setting_default[numberElement.name as keyof typeof g_setting_default] as number;
+            numberElement.value = String(value);
+        } else if (minValue !== null && value < parseFloat(minValue)) {
             numberElement.value = minValue;
             result[numberElement.name] = parseFloat(minValue);
         } else if (maxValue !== null && value > parseFloat(maxValue)) {

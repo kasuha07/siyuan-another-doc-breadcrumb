@@ -6,7 +6,6 @@ export const CONSTANTS = {
     OBSERVER_RANDOM_DELAY: 500, // 插入链接、引用块和自定义时，在OBSERVER_RANDOM_DELAY_ADD的基础上增加延时，单位毫秒
     OBSERVER_RANDOM_DELAY_ADD: 100, // 插入链接、引用块和自定义时，延时最小值，单位毫秒
     OBSERVER_RETRY_INTERVAL: 1000, // 找不到页签时，重试间隔
-    STYLE_ID: "fake-doc-breadcrumb-plugin-style",
     ICON_ALL: 2,
     ICON_NONE: 0,
     ICON_CUSTOM_ONLY: 1,
