@@ -153,17 +153,21 @@ export async function parseDocPath(docDetail: any): Promise<PathObject[]> {
     // getListDocsByPathAPIFilePath 仅当入参 fullPath 为 null 时才返回 null；docDetail.path 由 API 返回必然存在
     let docPath = getListDocsByPathAPIFilePath(docDetail.path, docDetail.box)!;
     let pathArray = docPath.substring(0, docPath.length - 3).split("/");
-    // 处理并发意外
+    // 处理并发意外；hpath 仍可能为 null（内核返回异常），降级用 id 路径兜底，避免整条构建链中断
     let hpath = docDetail.hpath ?? await getHPathByID(docDetail.docId);
-    let hpathArray = hpath.split("/");
+    let hpathArray = isValidStr(hpath) ? hpath.split("/") : pathArray;
     let resultArray: PathObject[] = [];
     let notebooks = getNotebooks() ?? [];
-    let box: any;
+    // 笔记本列表缺失当前 box（内核数据异常）时降级：以 box id 兜底，保证路径可渲染
+    let box: any = null;
     for (let notebook of notebooks) {
         if (notebook.id == docDetail.box) {
             box = notebook;
             break;
         }
+    }
+    if (!box) {
+        box = { "id": docDetail.box, "name": docDetail.box, "icon": "" };
     }
     let temp: PathObject = {
         "name": box.name,
@@ -185,14 +189,15 @@ export async function parseDocPath(docDetail: any): Promise<PathObject[]> {
         }
         let iconResult = await Promise.all(promiseList);
         for (let i of iconResult) {
-            icons.push(i.icon);
-            subFileCounts.push(i.subFileCount);
+            // getDocInfo 可能返回 null（内核异常），逐项降级，单项失败不中断构建链
+            icons.push(i?.icon ?? "");
+            subFileCounts.push(i?.subFileCount ?? -1);
         }
     }
     let temp_path = "";
     for (let i = 1; i < pathArray.length; i++) {
         let temp: PathObject = {
-            "name": hpathArray[i],
+            "name": hpathArray[i] ?? pathArray[i],
             "id": pathArray[i],
             "icon": "",
             "path": `${temp_path}/${pathArray[i]}.sy`,
