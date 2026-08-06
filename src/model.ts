@@ -20,8 +20,10 @@ export async function buildDocumentBreadcrumbModel(protyle: any, documentId: str
     const pathObjects = await parseDocPath(docDetail);
     debugPush("OBJECT", pathObjects);
 
-    const notebookDocFlag = isNotebookDoc(protyle.path, protyle.notebookId);
-    const entries = await buildEntriesFromPath(pathObjects, protyle);
+    // docDetail.path / docDetail.box 来自内核 API（getCurrentDocDetail 已消除
+    // 主 ws 广播与 protyle ws 更新之间的顺序竞态），不使用 protyle 上的可能旧值
+    const notebookDocFlag = isNotebookDoc(docDetail.path, docDetail.box);
+    const entries = await buildEntriesFromPath(pathObjects, docDetail);
 
     let adjacent = null;
     if (state.g_setting.showAdjacentDocButton !== CONSTANTS.ADJ_NONE) {
@@ -39,7 +41,7 @@ export async function buildDocumentBreadcrumbModel(protyle: any, documentId: str
  * 将路径对象数组转为 BreadcrumbEntry 列表。
  * 折叠逻辑在此阶段完成，渲染时不再根据高度逐个添加 ellipsis。
  */
-export async function buildEntriesFromPath(pathObjects: PathObject[], protyle: any): Promise<BreadcrumbEntry[]> {
+export async function buildEntriesFromPath(pathObjects: PathObject[], docDetail: any): Promise<BreadcrumbEntry[]> {
     const entries: BreadcrumbEntry[] = [];
     // 折叠隐藏起始位置
     const foldStartAt = state.g_setting.showNotebook ? state.g_setting.foldedFrontShow :
@@ -131,16 +133,16 @@ export async function buildEntriesFromPath(pathObjects: PathObject[], protyle: a
     // 最后一个文档、且不含子文档时不再显示箭头
     const lastEntry = entries[entries.length - 1];
     if (lastEntry && lastEntry.kind === "document") {
-        lastEntry.hasChildren = await isChildDocExist(protyle, lastEntry.id);
+        lastEntry.hasChildren = await isChildDocExist(docDetail, lastEntry.id);
     }
 
     return entries;
 }
 
-async function isChildDocExist(protyle: any, id: any) {
+async function isChildDocExist(docDetail: any, id: any) {
     const sqlResponse = await listDocsByPath({
-        path: protyle.path,
-        notebook: protyle.notebookId,
+        path: docDetail.path,
+        notebook: docDetail.box,
         maxListLength: 3
     });
     if (sqlResponse && sqlResponse.files.length > 0) {

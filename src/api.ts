@@ -33,14 +33,36 @@ export async function getNodebookList() {
     return null;
 }
 
+/**
+ * 获取文档当前位置（物理路径 + 笔记本）。
+ *
+ * 竞态说明：protyle.path / protyle.notebookId 由 protyle 专属 ws 上的 moveDoc 消息更新，
+ * 而插件刷新由主 ws 的 moveDoc 广播触发，两条独立连接到达顺序无保证——主 ws 先到时
+ * 会读到旧路径，且思源不会二次刷新，导致旧路径长期显示。此处改用内核 API 获取位置：
+ * moveDoc 广播在事务提交后发出，HTTP 查询必然返回新值，从根上消除顺序依赖。
+ * API 失败（返回 null）时降级回退 protyle 上的值，避免渲染中断。
+ */
 export async function getCurrentDocDetail(docId: string, protyle: any) {
-    let result = {
-        path: protyle.path,
-        hpath: await getHPathByID(docId),
-        box: protyle.notebookId,
+    const [pathInfo, hpath] = await Promise.all([getPathByID(docId), getHPathByID(docId)]);
+    return {
+        path: pathInfo?.path ?? protyle.path,
+        hpath,
+        box: pathInfo?.notebook ?? protyle.notebookId,
         docId: protyle.block.rootID
     }
-    return result;
+}
+
+/**
+ * /api/filetree/getPathByID（v3.1.5+ 官方 API，与 getHPathByID 同走
+ * LoadTreeByBlockID，含已解锁加密笔记本兜底）。返回 { path, notebook }，
+ * 文档不存在或内核异常时返回 null，由调用方降级。
+ */
+export async function getPathByID(docId: string) {
+    let url = "/api/filetree/getPathByID";
+    let data = {
+        id: docId
+    }
+    return parseBody(request(url, data));
 }
 
 export async function getHPathByID(docId: string) {
