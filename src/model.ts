@@ -155,9 +155,11 @@ async function isChildDocExist(docDetail: any, id: any) {
 }
 
 export async function parseDocPath(docDetail: any): Promise<PathObject[]> {
-    // getListDocsByPathAPIFilePath 仅当入参 fullPath 为 null 时才返回 null；docDetail.path 由 API 返回必然存在
-    let docPath = getListDocsByPathAPIFilePath(docDetail.path, docDetail.box)!;
-    let pathArray = docPath.substring(0, docPath.length - 3).split("/");
+    // getListDocsByPathAPIFilePath 仅当入参 fullPath 为 null 时才返回 null；
+    // docDetail.path 为 pathInfo?.path ?? protyle.path，removeDoc/索引未就绪时两者可能均为 null，
+    // 此时降级为空数组（面包屑只渲染到笔记本层级），避免 null.substring 崩溃
+    let docPath = getListDocsByPathAPIFilePath(docDetail.path, docDetail.box);
+    let pathArray = docPath ? docPath.substring(0, docPath.length - 3).split("/") : [];
     // 处理并发意外；hpath 仍可能为 null（内核返回异常），降级用 id 路径兜底，避免整条构建链中断
     let hpath = docDetail.hpath ?? await getHPathByID(docDetail.docId);
     let hpathArray = isValidStr(hpath) ? hpath.split("/") : pathArray;
