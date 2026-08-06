@@ -7,6 +7,7 @@
  * - 滚动位置保存与恢复；
  * - destroy 完整清理。
  */
+import { saveLayout } from "siyuan";
 import { CONSTANTS } from "./constants";
 import { debugPush, errorPush, warnPush } from "./logger";
 import { state } from "./state";
@@ -31,13 +32,27 @@ import type { BreadcrumbModel, ControllerAction } from "./types";
  * wysiwyg focusin / tab 点击 / dock 点击时更新活动窗口），因此默认情况下
  * openTab 可能把文档开进“最近激活”的另一个分屏，而非面包屑所在分屏。
  * 此函数按思源 setPanelFocus 的取参方式（protyle.model.element.parentElement.parentElement）
- * 定位 wnd，用 DOM 类与 activetime 模拟窗口激活，副作用最小。
+ * 定位 wnd，完整复刻思源 setPanelFocus（app/src/layout/util.ts）：
+ * - 已激活早退：窗口已是活动窗口时不重复刷新 activetime、不重复保存布局，
+ *   避免无谓地把本窗口 activetime 推到最新而掩盖真实激活顺序（activetime 偏差）；
+ * - tab / dock / wnd 三组激活态先清后设（此前跳过 dock tab 状态 .dock__item--activefocus）；
+ * - saveLayout：此前跳过，布局变更不落盘；
+ * - activetime 采用与思源一致的写法与目标元素。
  */
 function activateProtyleWnd(protyle: any) {
     const wndElement = protyle?.model?.element?.parentElement?.parentElement;
     if (!(wndElement instanceof HTMLElement) || wndElement.getAttribute("data-type") !== "wnd") {
         return;
     }
+    if (wndElement.classList.contains("layout__wnd--active")) {
+        return;
+    }
+    document.querySelectorAll(".layout__tab--active").forEach((element) => {
+        element.classList.remove("layout__tab--active");
+    });
+    document.querySelectorAll(".dock__item--activefocus").forEach((element) => {
+        element.classList.remove("dock__item--activefocus");
+    });
     document.querySelectorAll(".layout__wnd--active").forEach((element) => {
         element.classList.remove("layout__wnd--active");
     });
@@ -46,8 +61,10 @@ function activateProtyleWnd(protyle: any) {
     // 当前 tab 的 activetime 保证“已打开文档”匹配时优先落回本分屏
     const focusTab = wndElement.querySelector(".layout-tab-bar .item--focus");
     if (focusTab instanceof HTMLElement) {
-        focusTab.setAttribute("data-activetime", String(Date.now()));
+        focusTab.setAttribute("data-activetime", (new Date()).getTime().toString());
     }
+    // 与思源 setPanelFocus 一致：窗口由非激活变为激活时保存布局（SDK 公开 API）
+    saveLayout(() => {});
 }
 
 export function getNativeBreadcrumbParts(protyle: any) {
@@ -168,9 +185,11 @@ export function captureScrollState(element: HTMLElement) {
     };
 }
 
-export function restoreScrollState(element: HTMLElement, state: any, forceEnd: boolean) {
+export function restoreScrollState(element: HTMLElement, state: any, forceEnd: boolean, isCancelled?: () => boolean) {
     requestAnimationFrame(() => {
-        if (!element.isConnected) {
+        // isCancelled：同行模式滚动容器是原生 bar（destroy 后仍 connected），
+        // 仅靠 isConnected 无法拦住 destroy 后残留写入，需显式取消标志
+        if (!element.isConnected || isCancelled?.()) {
             return;
         }
         const maxScrollLeft = Math.max(0, element.scrollWidth - element.clientWidth);
@@ -196,6 +215,8 @@ export class InlineBreadcrumbController {
     lastFingerprint: string | null = null;
     contentObserver: MutationObserver | null = null;
     resizeObserver: ResizeObserver | null = null;
+    /** destroy 后置真：拒绝排队中的异步回调（rAF 等）继续写入 DOM */
+    destroyed = false;
     /** 分屏拖拽等连续尺寸变化时，ResizeObserver 以 rAF 合并为每帧最多一次重算 */
     resizeFrame = 0;
     root: HTMLElement | null = null;
@@ -287,7 +308,7 @@ export class InlineBreadcrumbController {
         }
         this.resizeFrame = requestAnimationFrame(() => {
             this.resizeFrame = 0;
-            if (!this.nativeBar?.isConnected) {
+            if (this.destroyed || !this.nativeBar?.isConnected) {
                 return;
             }
             applyBreadcrumbEllipsis(this.nativeBar);
@@ -311,8 +332,9 @@ export class InlineBreadcrumbController {
 
         if (!this.nativeBar) {
             // 两行模式：插件根节点自身滚动，处理滚轮；
-            // 同行模式：整体滚动由思源 mousewheel 处理，无需插件监听
-            this.root?.addEventListener("wheel", this.handleWheel, { signal, passive: false });
+            // 同行模式：整体滚动由思源 mousewheel 处理，无需插件监听。
+            // passive 与思源原生一致：不 preventDefault，不劫持页面垂直滚动
+            this.root?.addEventListener("wheel", this.handleWheel, { signal, passive: true });
         }
     }
 
@@ -521,6 +543,9 @@ export class InlineBreadcrumbController {
             return;
         }
 
+        // 与思源原生一致采用 passive 语义（原生 breadcrumb/index.ts 绑定
+        // passive: true 的 mousewheel）：只驱动本容器水平滚动，不 preventDefault，
+        // 垂直滚动照常传给页面，不再劫持。
         const delta = Math.abs(event.deltaX) >= Math.abs(event.deltaY)
             ? event.deltaX
             : event.deltaY;
@@ -529,13 +554,14 @@ export class InlineBreadcrumbController {
             return;
         }
 
-        const before = scroller.scrollLeft;
-        scroller.scrollLeft += delta;
+        // deltaMode 归一化为像素：0=像素，1=行（Firefox 默认），2=页
+        const factor = event.deltaMode === WheelEvent.DOM_DELTA_LINE
+            ? 16
+            : event.deltaMode === WheelEvent.DOM_DELTA_PAGE
+                ? scroller.clientWidth
+                : 1;
 
-        // 到达滚动边缘时不拦截，让外部滚动继续工作
-        if (scroller.scrollLeft !== before) {
-            event.preventDefault();
-        }
+        scroller.scrollLeft += delta * factor;
     }
 
     dispatchAction(action: ControllerAction, target: Element, event: Event) {
@@ -687,11 +713,13 @@ export class InlineBreadcrumbController {
         this.cachedRoot = this.root.cloneNode(true) as HTMLElement;
 
         // 首次渲染或文档切换：滚到最右端；同文档刷新：保留原位置
-        restoreScrollState(scroller as HTMLElement, scrollState, forceEnd);
+        restoreScrollState(scroller as HTMLElement, scrollState, forceEnd, () => this.destroyed);
     }
 
     destroy() {
         this.revision += 1;
+        // 拒绝排队中的 rAF（restoreScrollState）在 destroy 后继续写入原生 bar
+        this.destroyed = true;
         if (this.resizeFrame !== 0) {
             cancelAnimationFrame(this.resizeFrame);
             this.resizeFrame = 0;

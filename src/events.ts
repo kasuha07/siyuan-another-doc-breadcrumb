@@ -5,6 +5,7 @@ import * as siyuan from "siyuan";
 import { debugPush, errorPush, infoPush, warnPush } from "./logger";
 import { state } from "./state";
 import { getAllShowingDocId } from "./utils";
+import { clearDocOutlineCache } from "./api";
 import { destroyAllControllers, inlineControllerRegistry } from "./controller";
 
 /**
@@ -102,6 +103,9 @@ export function eventBusHandler(detail: any) {
     }
     try {
         debugPush("检查刷新中（由重命名、移动或删除触发）");
+
+        // 结构变更（重命名/移动）会影响大纲标题名，主动失效大纲缓存
+        clearDocOutlineCache();
 
         const allEditor = siyuan.getAllEditor();
         const ids = getAllShowingDocId();

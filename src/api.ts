@@ -201,15 +201,34 @@ export async function createDoc(notebookId: string, path: string, title: string,
     throw new Error(response.msg || "createDoc failed");
 }
 
+/**
+ * 大纲缓存：面包屑“>”箭头菜单点击频繁，每次全量 getDocOutline（内核重新遍历
+ * 整棵文档树）代价高；同一文档短时间内重复打开菜单直接复用。
+ * - TTL：文档内容编辑后大纲可能过期，短 TTL 兼顾新鲜度；
+ * - 结构变更事件（moveDoc/rename/removeDoc，标题名随之变化）由
+ *   events.ts 调用 clearDocOutlineCache 主动失效；
+ * - 失败（null）不缓存，下次点击重试。
+ */
+const OUTLINE_CACHE_TTL_MS = 30 * 1000;
+const outlineCache = new Map<string, { data: any; time: number }>();
+
+export function clearDocOutlineCache() {
+    outlineCache.clear();
+}
+
 export async function getDocOutline(docId: string) {
+    const cached = outlineCache.get(docId);
+    if (cached && Date.now() - cached.time < OUTLINE_CACHE_TTL_MS) {
+        return cached.data;
+    }
     let url = "/api/outline/getDocOutline";
     let data = { "id": docId };
     let response = await request(url, data);
-    if (response?.code == 0) {
-        return response.data;
-    } else {
-        return null;
+    const outline = response?.code == 0 ? response.data : null;
+    if (outline != null) {
+        outlineCache.set(docId, { data: outline, time: Date.now() });
     }
+    return outline;
 }
 
 export async function getDocInfo(docId: string) {
