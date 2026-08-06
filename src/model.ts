@@ -192,7 +192,9 @@ export async function parseDocPath(docDetail: any): Promise<PathObject[]> {
         for (let i = 1; i < pathArray.length; i++) {
             promiseList.push(getDocInfo(pathArray[i]));
         }
-        let iconResult = await Promise.all(promiseList);
+        // Promise.all 中任一 getDocInfo 失败（父文档被删/移动/内核异常）都会整体 reject、
+        // 中断整条构建链导致面包屑空白，故逐项 catch 降级为 null，配合下方 ?. 逐点兜底
+        let iconResult = await Promise.all(promiseList.map(p => p.catch(() => null)));
         for (let i of iconResult) {
             // getDocInfo 可能返回 null（内核异常），逐项降级，单项失败不中断构建链
             icons.push(i?.icon ?? "");

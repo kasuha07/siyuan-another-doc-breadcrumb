@@ -134,8 +134,16 @@ export async function request(url: string, data: any) {
 }
 
 export async function parseBody(response: any) {
-    let r = await response;
-    return r.code === 0 ? r.data : null;
+    // 请求层两种失败形态都按既定协议返回 null 由调用方降级，绝不向上抛：
+    // 1. fetch 网络异常时 request 返回 null → 直接短路返回 null，避免对 null 取 .code 抛 TypeError；
+    // 2. 响应非 JSON（如内核异常返回 HTML 错误页）时 response.json() reject → 捕获后返回 null。
+    let r: any = null;
+    try {
+        r = await response;
+    } catch (err) {
+        return null;
+    }
+    return r != null && r.code === 0 ? r.data : null;
 }
 
 export async function createAndOpenEmptyDocAt(box: string, path: string) {
