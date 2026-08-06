@@ -362,7 +362,6 @@ async function loadSubmenu(item: Element, menuItemElement: Element, maxDepth: nu
             // 加载子文档
             const sqlResult = [{ path, box }];
             childDocuments = await getChildDocuments(docId, sqlResult);
-            submenuCache.set(cacheKey, childDocuments);
         } catch (err) {
             // 加载失败（网络/kernel 错误、文档已删除等）：重置标记允许移开鼠标后重试，并给出可见提示
             errorPush(err);
@@ -378,6 +377,10 @@ async function loadSubmenu(item: Element, menuItemElement: Element, maxDepth: nu
     if (!menuItemElement.isConnected) {
         return;
     }
+
+    // 菜单仍打开才写入缓存：菜单关闭时 menuCloseCB 已清空缓存，
+    // 若此处回填会把过期数据带进之后重新打开的菜单生命周期（数据新鲜性失效）
+    submenuCache.set(cacheKey, childDocuments);
 
     if (!childDocuments || childDocuments.length === 0) {
         submenuContainer.innerHTML = `<button class="b3-menu__item" disabled><span class="b3-menu__label">${state.language["no_doc"]}</span></button>`;

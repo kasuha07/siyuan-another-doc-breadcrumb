@@ -23,7 +23,7 @@ function getOutlineChildren(item: any): any[] {
     return item?.blocks || item?.children || [];
 }
 
-export async function addBlockBdMenuListener(protyle: any) {
+export function addBlockBdMenuListener(protyle: any, signal: AbortSignal) {
     // 限制范围，避免影响插件插入的面包屑
     const breadcrumbBar = protyle?.breadcrumb?.element;
     if (!(breadcrumbBar instanceof HTMLElement)) {
@@ -34,7 +34,7 @@ export async function addBlockBdMenuListener(protyle: any) {
     }
     breadcrumbBar.dataset["ogFdbAddedEl"] = "true";
     const docId = protyle.block.rootID;
-    breadcrumbBar.addEventListener('click', async (event: any) => {
+    const onClick = async (event: any) => {
         // 使用 .closest() 判断点击的是否是箭头或其内部元素
         const arrowElement = event.target.closest('.protyle-breadcrumb__arrow');
         if (!arrowElement) {
@@ -211,5 +211,8 @@ export async function addBlockBdMenuListener(protyle: any) {
                 state.g_relativeMenu = null;
             }
         }
-    });
+    };
+    // 监听器生命周期绑定在 controller 的 AbortController 上：插件卸载或
+    // controller 销毁时自动移除，避免原生 bar 上残留旧闭包（重载后仍响应点击）
+    breadcrumbBar.addEventListener('click', onClick, { signal });
 }

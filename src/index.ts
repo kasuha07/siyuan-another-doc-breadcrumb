@@ -28,7 +28,7 @@ import { generateSettingPanel, loadUISettings, SettingProperty } from "./setting
 import { removeStyle, setStyle } from "./style";
 import { destroyAllControllers } from "./controller";
 import { removeAdjacentTooltip } from "./adjacent";
-import { eventBusHandler, handleDestroyProtyle, initRetry, mainEventBusHander, refreshAllShowingProtyles } from "./events";
+import { eventBusHandler, handleDestroyProtyle, initRetry, mainEventBusHander, refreshAllShowingProtyles, resetEventState } from "./events";
 import { isMobile, isSomePluginExist } from "./utils";
 
 /**
@@ -139,6 +139,10 @@ export class FakeDocBreadcrumb extends Plugin {
     }
 
     onunload() {
+        // 先清空插件实例引用：合并刷新定时器等延迟任务在卸载后触发时
+        // 会经 main() 的存活检查直接返回，避免重新挂载已卸载的 controller
+        state.g_pluginInstance = undefined;
+        resetEventState();
         destroyAllControllers();
         removeAdjacentTooltip();
         // 清理所有模式下的插件节点与状态类，保证 DOM 完全恢复

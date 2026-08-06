@@ -626,7 +626,7 @@ export class InlineBreadcrumbController {
         } finally {
             // 原生块面包屑箭头的大纲菜单绑定（原生 render 后 dataset 丢失，需重复绑定）
             try {
-                addBlockBdMenuListener(this.protyle);
+                addBlockBdMenuListener(this.protyle, this.abortController.signal);
             } catch (err) {
                 warnPush(err);
             }
@@ -709,6 +709,13 @@ export class InlineBreadcrumbController {
 
         if (this.host?.isConnected) {
             this.host.classList.remove(CONSTANTS.HOST_STATE_CLASS_NAME);
+        }
+
+        // 原生 bar 上的大纲菜单监听器已随 abortController 移除，同步清除防重复绑定标记，
+        // 否则插件重载/重新挂载后新 controller 因标记残留而不再绑定监听器
+        const breadcrumbBar = this.protyle?.breadcrumb?.element;
+        if (breadcrumbBar instanceof HTMLElement) {
+            delete breadcrumbBar.dataset["ogFdbAddedEl"];
         }
 
         this.root = null;
