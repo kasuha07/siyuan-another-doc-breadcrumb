@@ -283,8 +283,17 @@
     text-overflow: ellipsis;
 }
 
-/* ===== 覆盖 savor 主题样式 ===== */
+/* ===== 覆盖 savor 主题样式 =====
+ * savor 主题规则：
+ *   :is(.protyle-breadcrumb,.protyle-breadcrumb__bar)>.protyle-breadcrumb__bar
+ *   .protyle-breadcrumb__item:first-child:before { content: "📄" ... }
+ * 会命中 bar 内首个 .protyle-breadcrumb__item 并加上 📄。
+ * 同行模式下插件内容带（.og-fdb-inline-breadcrumb）是 bar 的第一个子元素，
+ * 其内部第一个 item 恰好满足 :first-child，会被 savor 误加 📄。
+ * 这里覆盖为空。注意同行模式内容带在 bar 内部（host > bar > 内容带），
+ * 必须写全层级，否则选择器不命中导致覆盖失效。 */
 .protyle-breadcrumb.og-fdb-inline-host
+    > .protyle-breadcrumb__bar
     > .og-fdb-inline-breadcrumb
     .protyle-breadcrumb__item:first-child::before,
 .og-fake-doc-breadcrumb-container.protyle-breadcrumb
