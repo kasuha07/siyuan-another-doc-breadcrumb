@@ -30,11 +30,37 @@ function getAdjacentTooltip(): HTMLDivElement {
     return adjacentTooltip;
 }
 
-export function removeAdjacentTooltip() {
+/**
+ * 隐藏悬浮提示：清延迟定时器 + 隐藏 DOM（不销毁节点，保留复用已创建的 .tooltip）。
+ * 鼠标离开之外，窗口失焦（Alt-Tab / 点击其他应用窗口）或页面隐藏（切后台标签）时
+ * 鼠标停在按钮上不触发 mouseleave，tooltip 会残留在屏幕上，必须主动隐藏。
+ */
+function hideAdjacentTooltip() {
     if (adjacentTooltipTimer) {
         clearTimeout(adjacentTooltipTimer);
         adjacentTooltipTimer = null;
     }
+    if (adjacentTooltip) {
+        adjacentTooltip.style.display = "none";
+    }
+}
+
+/**
+ * 全局失焦隐藏监听器：模块级单例只注册一次，回调只操作模块级 tooltip 状态、
+ * 不引用具体按钮，按钮随导航重建/销毁时无需解绑，无监听器泄漏。
+ */
+let adjacentTooltipHideBound = false;
+function ensureAdjacentTooltipHideListeners() {
+    if (adjacentTooltipHideBound) {
+        return;
+    }
+    adjacentTooltipHideBound = true;
+    window.addEventListener("blur", hideAdjacentTooltip);
+    document.addEventListener("visibilitychange", hideAdjacentTooltip);
+}
+
+export function removeAdjacentTooltip() {
+    hideAdjacentTooltip();
     adjacentTooltip?.remove();
     adjacentTooltip = null;
 }
@@ -55,15 +81,8 @@ function bindAdjacentTooltip(button: HTMLButtonElement, text: string) {
             tip.style.display = "block";
         }, 100);
     });
-    button.addEventListener("mouseleave", () => {
-        if (adjacentTooltipTimer) {
-            clearTimeout(adjacentTooltipTimer);
-            adjacentTooltipTimer = null;
-        }
-        if (adjacentTooltip) {
-            adjacentTooltip.style.display = "none";
-        }
-    });
+    button.addEventListener("mouseleave", hideAdjacentTooltip);
+    ensureAdjacentTooltipHideListeners();
 }
 
 export function createAdjacentDocNav(adjacent: AdjacentResult, controller: ActionRegistrar) {

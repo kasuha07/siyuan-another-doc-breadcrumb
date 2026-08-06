@@ -12,15 +12,33 @@ import { escapeHTML, getPluginInstance, stripHTML } from "./utils";
 import { guardMenuOpen, menuCloseCB, saveLastMenu } from "./menus";
 
 /**
- * 取大纲项的下一级子标题列表。
- * getDocOutline 返回 []*Path（kernel/model/outline.go，v3.7.3），每项的下一级子标题
- * 存于 blocks 字段（[]*Block，kernel/model/block.go Path 结构 json:"blocks,omitempty"）；
- * children 字段（[]*Path，子路径节点）在同结构中存在，但 outline 响应中恒为空（未赋值）。
- * 两字段名均未在 API 文档中声明，双字段容错源自上游插件对历史版本的兼容；
- * 若升级后字段改名/结构调整，此处返回 []，上层表现为菜单为空并提示“无内容”，不会抛错。
+ * 单次 DFS 遍历 getDocOutline 响应，建立“节点 id → 直接子标题数组”索引：
+ * 后续按 id 查找子标题 O(1)，替代原先每次点击对整棵标题树递归探测字段。
+ *
+ * 响应结构（kernel/model/outline.go OutlineInBox，v3.7.3）为顶级标题的 Path 数组，
+ * 直接子标题的存放字段因节点类型而异：
+ * - 顶层 Path 节点：blocks（kernel Path.Blocks，[]*Block，json:"blocks,omitempty"）；
+ * - 嵌套 Block 节点（标题）：children（kernel Block.Children，[]*Block，json 恒序列化）。
+ * 两字段名均未在 API 文档中声明，但思源前端自身（app/src/util/Tree.ts genHTML/
+ * genBlockHTML）按同一契约解析；此处仅在建立索引时探测一次，查找与菜单构建均经
+ * 索引取值，不再触碰字段。若升级后结构调整，只需修改本函数。
  */
-function getOutlineChildren(item: any): any[] {
-    return item?.blocks || item?.children || [];
+function buildHeadingChildrenIndex(outlineData: any[]): Map<string, any[]> {
+    const index = new Map<string, any[]>();
+    const visit = (node: any) => {
+        if (!node || typeof node.id !== "string") {
+            return;
+        }
+        const children = node.blocks || node.children || [];
+        index.set(node.id, children);
+        for (const child of children) {
+            visit(child);
+        }
+    };
+    for (const item of outlineData) {
+        visit(item);
+    }
+    return index;
 }
 
 export function addBlockBdMenuListener(protyle: any, signal: AbortSignal) {
@@ -88,6 +106,8 @@ export function addBlockBdMenuListener(protyle: any, signal: AbortSignal) {
                 showMessage(state.language["nothingToDisplay"] + "--- 另一个文档面包屑");
                 return;
             }
+            // 一次性建立整棵标题树的子标题索引（结构与字段契约见 buildHeadingChildrenIndex）
+            const headingChildrenIndex = buildHeadingChildrenIndex(outlineData);
             // 根据图标类型来决定菜单内容
             if (iconHref === '#iconFile') {
                 // 如果是文档图标，显示所有顶级标题
@@ -96,29 +116,10 @@ export function addBlockBdMenuListener(protyle: any, signal: AbortSignal) {
             } else if (iconHref.startsWith('#iconH')) {
                 // 如果是标题图标 (H1-H6)，显示其下的直接子标题
                 logPush(`目标是标题节点，查找 ID: ${nodeId} 的子标题...`);
-                // 递归查找指定 ID 的标题及其子项
-                function findHeadingById(items: any[], targetId: string): any {
-                    for (const item of items) {
-                        if (item.id === targetId) {
-                            return item;
-                        }
-                        // 顶层标题 / 深层标题：blocks 与 children 双字段都搜索（blocks 优先），
-                        // 字段语义见 getOutlineChildren 注释
-                        const childLists = [item.blocks, item.children];
-                        for (const children of childLists) {
-                            if (Array.isArray(children) && children.length > 0) {
-                                const found = findHeadingById(children, targetId);
-                                if (found) return found;
-                            }
-                        }
-                    }
-                    return null;
-                }
-
-                const parentHeading = findHeadingById(outlineData, nodeId);
-                if (parentHeading) {
-                    // 优先使用 blocks，如果没有则使用 children
-                    menuItems = getOutlineChildren(parentHeading);
+                // 索引查找 O(1)：get 返回子标题数组（无子标题时为空数组，未找到时 undefined）
+                const childHeadings = headingChildrenIndex.get(nodeId);
+                if (childHeadings) {
+                    menuItems = childHeadings;
                 } else {
                     logPush(`标题 ${nodeId} 没有找到或没有子标题。`);
                 }
@@ -165,7 +166,7 @@ export function addBlockBdMenuListener(protyle: any, signal: AbortSignal) {
                         }
                     };
 
-                    const childItems = getOutlineChildren(item);
+                    const childItems = headingChildrenIndex.get(item.id) ?? [];
                     if (childItems.length > 0) {
                         menuItem.type = "submenu";
                         menuItem.submenu = buildMenuItems(childItems);

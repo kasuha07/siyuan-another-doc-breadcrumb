@@ -48,7 +48,7 @@ export function handleDestroyProtyle(detail: any) {
 }
 
 /**
- * ws-main 文档结构变更（moveDoc/rename/removeDoc/filetreeSortChanged）刷新合并：
+ * ws-main 文档结构变更（createDoc/moveDoc/rename/removeDoc/filetreeSortChanged）刷新合并：
  * 批量移动 N 个文档时，kernel 对每个文档（含其全部子文档）单独推送一条 moveDoc 事件
  * （见 kernel/model/file.go moveDoc），若每条事件都立即刷新所有打开的编辑器
  * （N×M 次串行完整刷新）会产生 API 洪峰。这里以短延时窗口合并：窗口内到达的
@@ -98,13 +98,17 @@ export function eventBusHandler(detail: any) {
     // ws-main 为高频事件（输入时每次事务保存都会推送 savedoc），
     // 必须先做 cmd 过滤，非目标消息直接返回，避免任何开销。
     const cmd = detail?.detail?.cmd;
-    if (!["moveDoc", "rename", "removeDoc", "filetreeSortChanged"].includes(cmd)) {
+    // create：新建文档（含标题/列表转文档等路径，内核统一走 PushCreate →
+    // NewCmdResult("create")，见 kernel/model/push_reload.go，思源前端 Files.ts 同款监听）。
+    // 新建文档会改变同层/相邻文档列表，必须失效相邻文档缓存，否则 3 分钟 TTL 内
+    // 上一篇/下一篇会跳过新文档。
+    if (!["create", "moveDoc", "rename", "removeDoc", "filetreeSortChanged"].includes(cmd)) {
         return;
     }
     try {
-        debugPush("检查刷新中（由重命名、移动或删除触发）");
+        debugPush("检查刷新中（由创建、重命名、移动或删除触发）");
 
-        // 结构变更（重命名/移动）会影响大纲标题名，主动失效大纲缓存
+        // 结构变更（创建/重命名/移动/删除）会影响大纲标题名，主动失效大纲缓存
         clearDocOutlineCache();
 
         const allEditor = siyuan.getAllEditor();
