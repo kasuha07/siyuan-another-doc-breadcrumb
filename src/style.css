@@ -48,9 +48,8 @@
     /* 滚动由原生 bar 统一承担 */
     overflow: visible;
 
-    /* 与原生内容带的分隔由 JS 渲染为内容带末尾的装饰箭头
-     * .og-fdb-inline__divider，不再使用边框竖线；
-     * 箭头尺寸与原生 .protyle-breadcrumb__arrow--interactive 保持一致 */
+    /* 原生首项后的箭头由控制器移动到插件当前文档之后，
+     * 不再额外渲染内容带分隔符。 */
 }
 
 /* 内容带内所有直接子项不得继续压缩（插件容器、原生路径项） */
@@ -166,26 +165,6 @@
     width: 14px;
 }
 
-/* 内容带与原生内容带之间的装饰分隔箭头（同行模式，无交互） */
-.og-fdb-inline__divider {
-    align-items: center;
-    align-self: center;
-    box-sizing: border-box;
-    color: var(--b3-theme-on-surface);
-    display: inline-flex;
-    flex: 0 0 auto;
-    height: 24px;
-    justify-content: center;
-    margin: 3px 0;
-    padding: 5px;
-    pointer-events: none;
-    user-select: none;
-    width: 24px;
-}
-.og-fdb-inline__divider > svg {
-    height: 14px;
-    width: 14px;
-}
 .og-fdb-inline__arrow:hover {
     color: var(--b3-menu-highlight-color, var(--b3-theme-on-background));
     background-color: var(--b3-menu-highlight-background, var(--b3-list-hover));

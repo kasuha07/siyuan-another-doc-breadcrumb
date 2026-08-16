@@ -60,27 +60,41 @@ export function addBlockBdMenuListener(protyle: any, signal: AbortSignal) {
         }
         // 获取箭头左侧的面包屑项目
         const precedingItem = arrowElement.previousElementSibling;
-        if (!precedingItem || !precedingItem.classList.contains('protyle-breadcrumb__item')) {
+        const standaloneDocumentBridge = !precedingItem
+            && arrowElement.parentElement === breadcrumbBar
+            && !!breadcrumbBar.parentElement?.previousElementSibling?.querySelector(
+                `:scope > .${CONSTANTS.INLINE_BREADCRUMB_CLASS_NAME}`
+            );
+        if (!standaloneDocumentBridge && (!precedingItem || !precedingItem.classList.contains('protyle-breadcrumb__item'))) {
             logPush("未找到箭头左侧的面包屑项目。");
+            return;
+        }
+        // 同行模式将原生块箭头移动到插件当前文档项之后；该项没有原生
+        // popover 图标，交给思源 Breadcrumb 自身继续处理块层级菜单。
+        if (precedingItem?.closest(`.${CONSTANTS.INLINE_BREADCRUMB_CLASS_NAME}`)) {
             return;
         }
         const afterItem = arrowElement.nextElementSibling;
         let nextNodeId = "";
-        if (afterItem && precedingItem.classList.contains('protyle-breadcrumb__item')) {
+        if (afterItem && (standaloneDocumentBridge || precedingItem?.classList.contains('protyle-breadcrumb__item'))) {
             nextNodeId = afterItem.dataset.nodeId;
         }
         // 提取 Node ID 和图标信息
-        const nodeId = precedingItem.dataset.nodeId;
-        const iconUseElement = precedingItem.querySelector('svg.popover__block use');
+        const nodeId = standaloneDocumentBridge ? docId : precedingItem?.dataset.nodeId;
+        const iconUseElement = standaloneDocumentBridge
+            ? null
+            : precedingItem?.querySelector('svg.popover__block use');
 
-        if (!nodeId || !iconUseElement) {
+        if (!nodeId || (!standaloneDocumentBridge && !iconUseElement)) {
             logPush("无法从面包屑项目中提取 node-id 或 icon。");
             return;
         }
         event.stopImmediatePropagation();
         event.stopPropagation();
         event.preventDefault();
-        const iconHref = iconUseElement.getAttributeNS('http://www.w3.org/1999/xlink', 'href');
+        const iconHref = standaloneDocumentBridge
+            ? '#iconFile'
+            : iconUseElement.getAttributeNS('http://www.w3.org/1999/xlink', 'href');
 
         logPush(`点击了 ID: ${nodeId} (${iconHref}) 旁边的箭头`);
         const menuId = "bid_" + nodeId;

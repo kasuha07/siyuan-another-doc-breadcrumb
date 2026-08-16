@@ -14,7 +14,7 @@ import { state } from "./state";
 import { isNotebookDocEnabled, isValidStr } from "./utils";
 import { openRefLinkAgent } from "./api";
 import { buildDocumentBreadcrumbModel } from "./model";
-import { renderBreadcrumbFragment, createBreadcrumbDivider } from "./render";
+import { renderBreadcrumbFragment, createBreadcrumbArrow } from "./render";
 import { createAdjacentDocNav, clickAdjacentDocButton, removeAdjacentTooltip } from "./adjacent";
 import { openHideMenu, openRelativeMenu } from "./menus";
 import { addBlockBdMenuListener } from "./breadcrumbMenu";
@@ -223,6 +223,9 @@ export class InlineBreadcrumbController {
     wrapper: HTMLElement | null = null;
     host: HTMLElement | null = null;
     nativeBar: HTMLElement | null = null;
+    /** 原生块面包屑 bar；同行模式与两行模式都用于移除重复首项 */
+    nativeBlockBar: HTMLElement | null = null;
+    nativeDocumentBridgeEnabled = false;
     /** 同行模式：固定于 host 右侧按钮组的相邻文档导航容器 */
     adjacentNav: HTMLElement | null = null;
     parts: any = null;
@@ -257,6 +260,7 @@ export class InlineBreadcrumbController {
             return false;
         }
         this.parts = parts;
+        this.nativeBlockBar = parts.nativeBar;
 
         // 泛型限定元素为 HTMLElement：插件渲染的容器均为 HTMLElement，
         // 与下方 forEach 回调参数类型保持一致（querySelectorAll 默认返回 NodeListOf<Element>）
@@ -268,6 +272,7 @@ export class InlineBreadcrumbController {
         ).forEach((element: HTMLElement) => element.remove());
 
         const isCardPage = this.protyle.element.classList.contains("card__block");
+        this.nativeDocumentBridgeEnabled = !isCardPage;
         if (state.g_setting.oneLineBreadcrumb && !isCardPage) {
             // 同行模式：插件内容容器是原生 bar 的第一个 flex 子项，
             // bar 成为唯一滚动容器，形成连续内容带；
@@ -279,7 +284,6 @@ export class InlineBreadcrumbController {
                 .forEach((element: HTMLElement) => element.remove());
             this.root = createInlineRoot();
             parts.nativeBar.insertBefore(this.root, parts.nativeBar.firstElementChild);
-            this.startContentRestore();
             // 容器宽度变化（窗口缩放、侧栏开关、分屏拖拽）时重算省略
             this.resizeObserver = new ResizeObserver(() => {
                 this.scheduleBreadcrumbEllipsis();
@@ -294,6 +298,7 @@ export class InlineBreadcrumbController {
             parts.host.before(this.wrapper);
         }
 
+        this.startContentRestore();
         this.bindEvents();
         return true;
     }
@@ -390,13 +395,81 @@ export class InlineBreadcrumbController {
      * MutationObserver 只用于内容恢复，不参与布局计算。
      */
     startContentRestore() {
-        if (!this.nativeBar) {
+        if (!this.nativeBlockBar) {
             return;
         }
         this.contentObserver = new MutationObserver(() => {
-            this.restoreInlineRoot();
+            if (this.nativeBar) {
+                this.restoreInlineRoot();
+            } else {
+                this.syncNativeDocumentBreadcrumbBridge();
+            }
         });
-        this.contentObserver.observe(this.nativeBar, { childList: true });
+        this.contentObserver.observe(this.nativeBlockBar, { childList: true });
+    }
+
+    /**
+     * 思源原生块面包屑的首项也是当前文档自身，
+     * 会与插件路径末尾的当前文档重复。移除原生首项，并把它后面的
+     * 原生箭头移动到同行模式的插件当前文档之后，使原生箭头仍能打开
+     * 块层级菜单；两行模式则保留箭头在原生 bar 中。
+     *
+     * 插件当前项补上 data-node-id，供思源原生箭头处理器识别；当前项自身
+     * 的左键/右键仍由插件事件代理处理。没有原生箭头时，当前文档若有子文档
+     * 则回退到插件箭头，避免失去子文档菜单入口。
+     */
+    syncNativeDocumentBreadcrumbBridge() {
+        if (!this.nativeDocumentBridgeEnabled || !this.nativeBlockBar || !this.root || !this.lastModel?.entries.length) {
+            return;
+        }
+
+        const items = Array.from(this.root.querySelectorAll<HTMLElement>(":scope > .protyle-breadcrumb__item"));
+        const currentItem = items[items.length - 1];
+        const currentEntry = this.lastModel.entries[this.lastModel.entries.length - 1];
+        if (!currentItem || !currentEntry) {
+            return;
+        }
+        currentItem.dataset.nodeId = this.lastModel.documentId;
+
+        // 首项移除后，H1/H2 等标题同样使用 .protyle-breadcrumb__item，
+        // 必须按当前文档 id 精确匹配，不能再次取第一个 class 节点。
+        const nativeItems = Array.from(this.nativeBlockBar.querySelectorAll<HTMLElement>(":scope > .protyle-breadcrumb__item"));
+        const nativeItem = nativeItems.find(item => item.dataset.nodeId === this.lastModel?.documentId);
+        if (!this.nativeBar) {
+            nativeItem?.remove();
+            return;
+        }
+
+        const currentFollowing = currentItem.nextElementSibling as HTMLElement | null;
+        const nativeBridgeArrow = currentFollowing?.classList.contains("protyle-breadcrumb__arrow")
+            ? currentFollowing
+            : null;
+        const pluginFallbackArrow = currentFollowing?.classList.contains("og-fdb-inline__arrow")
+            ? currentFollowing
+            : null;
+        const nativeItemNext = nativeItem?.nextElementSibling;
+        const nativeArrow = nativeItemNext instanceof HTMLElement
+            && nativeItemNext.classList.contains("protyle-breadcrumb__arrow")
+            ? nativeItemNext
+            : null;
+
+        if (nativeArrow) {
+            // 原生重绘后会重新生成首项和箭头；使用新箭头，避免缓存旧节点。
+            pluginFallbackArrow?.remove();
+            nativeBridgeArrow?.remove();
+            this.root.appendChild(nativeArrow);
+        } else if (nativeItem && nativeBridgeArrow) {
+            // 原生内容只剩当前文档时，缓存中的旧原生箭头不应继续显示。
+            nativeBridgeArrow.remove();
+            if (currentEntry.hasChildren) {
+                this.root.appendChild(createBreadcrumbArrow(currentEntry, this));
+            }
+        } else if (!nativeBridgeArrow && !pluginFallbackArrow && currentEntry.hasChildren) {
+            this.root.appendChild(createBreadcrumbArrow(currentEntry, this));
+        }
+
+        // 必须在移动箭头后移除首项，确保箭头的 previousElementSibling 不被破坏。
+        nativeItem?.remove();
     }
 
     /**
@@ -412,6 +485,7 @@ export class InlineBreadcrumbController {
             return;
         }
         if (this.nativeBar.contains(this.root)) {
+            this.syncNativeDocumentBreadcrumbBridge();
             return;
         }
 
@@ -426,15 +500,13 @@ export class InlineBreadcrumbController {
             this.root = createInlineRoot();
             if (this.lastModel) {
                 this.root.appendChild(renderBreadcrumbFragment(this.lastModel.entries, this, true));
-                // 同行模式：内容带末尾追加与原生内容带之间的装饰分隔箭头
-                if (this.nativeBar && this.lastModel.entries.length > 0) {
-                    this.root.appendChild(createBreadcrumbDivider());
-                }
             }
             this.nativeBar.insertBefore(this.root, this.nativeBar.firstElementChild);
             // 相邻导航不参与 bar 重写，但需重建以同步 action registry
             this.syncAdjacentNav();
         }
+
+        this.syncNativeDocumentBreadcrumbBridge();
 
         // 同行模式：空间不足时恢复思源原生省略机制
         // （原生块面包屑每次移块都会变化，省略状态必须重算）
@@ -701,10 +773,7 @@ export class InlineBreadcrumbController {
 
         this.root.appendChild(renderBreadcrumbFragment(model.entries, this, !!this.nativeBar));
 
-        // 同行模式：内容带末尾追加与原生内容带之间的装饰分隔箭头
-        if (this.nativeBar && model.entries.length > 0) {
-            this.root.appendChild(createBreadcrumbDivider());
-        }
+        this.syncNativeDocumentBreadcrumbBridge();
 
         // 相邻文档导航：同行模式固定在右侧按钮组，两行模式跟随 root 末尾
         this.syncAdjacentNav();
@@ -756,6 +825,8 @@ export class InlineBreadcrumbController {
         this.wrapper = null;
         this.host = null;
         this.nativeBar = null;
+        this.nativeBlockBar = null;
+        this.nativeDocumentBridgeEnabled = false;
         this.adjacentNav = null;
         this.parts = null;
     }

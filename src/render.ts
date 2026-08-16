@@ -13,9 +13,9 @@ export function renderBreadcrumbFragment(entries: BreadcrumbEntry[], controller:
         const item = createBreadcrumbItem(entry, controller);
         fragment.appendChild(item);
 
-        // 同行模式下最后一个 entry（当前文档）不渲染展开箭头：
-        // 其展开入口由紧随其后的原生块面包屑箭头承担，
-        // 避免与装饰分隔符相邻出现 “> ·” 的冗余显示。
+        // 同行模式下最后一个 entry（当前文档）不直接渲染展开箭头：
+        // 控制器会把原生块面包屑的箭头移动到这里；原生没有箭头时，
+        // 再由控制器按需补回插件箭头。
         if (index === entries.length - 1 && inlineMode) {
             return;
         }
@@ -78,24 +78,6 @@ export function createBreadcrumbArrow(entry: BreadcrumbEntry, controller: Action
     button.appendChild(svg);
 
     return button;
-}
-
-/**
- * 装饰性分隔箭头（同行模式下内容带与原生内容带之间，无交互）
- */
-export function createBreadcrumbDivider() {
-    const span = document.createElement("span");
-    span.className = "og-fdb-inline__divider";
-    span.setAttribute("aria-hidden", "true");
-
-    const svgNS = "http://www.w3.org/2000/svg";
-    const svg = document.createElementNS(svgNS, "svg");
-    const use = document.createElementNS(svgNS, "use");
-    use.setAttributeNS("http://www.w3.org/1999/xlink", "xlink:href", "#iconRight");
-    svg.appendChild(use);
-    span.appendChild(svg);
-
-    return span;
 }
 
 /**
