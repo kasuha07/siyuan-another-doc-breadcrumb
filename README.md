@@ -47,7 +47,7 @@ This fork diverges from upstream `syplugin-fakeDocBreadcrumb` (v1.5.1; upstream 
 - **Stability & performance**: lazy submenu loading via container-level event delegation (upstream uses one MutationObserver per item); breadcrumb collapsing via binary search (reflow O(n) → O(log n)); document structure changes batched into one refresh per 100 ms window, eliminating request bursts on bulk moves; deduplicated open-document events; batch `getDocsInfo` instead of per-level lookups; init retries (up to 5) with fallback to default settings; unified fetch error handling with null fallbacks.
 - **Security**: document names and icons are escaped before being inserted into menu HTML (two XSS vectors closed).
 - **Lifecycle**: full cleanup on `destroy-protyle` — no leftover nodes after unload; settings saves rebuild only what changed; styles are injected via the official `pluginsStyle` mechanism and removed automatically on unload.
-- **Other**: The separator between the plugin and the native content strip in one-line mode uses CSS dots; removed the external debug protocol (`OpaqueGlassDebugV2`) dependency; three undocumented SiYuan dependencies (tab-close chain, outline API fields, encrypted-notebook `closed` semantics) verified against the v3.7.3 source and documented.
+- **Other**: The separator between the plugin and the native content strip in one-line mode uses the same CSS arrow as native SiYuan; removed the external debug protocol (`OpaqueGlassDebugV2`) dependency; three undocumented SiYuan dependencies (tab-close chain, outline API fields, encrypted-notebook `closed` semantics) verified against the v3.7.3 source and documented.
 
 ## Feedback bugs
 

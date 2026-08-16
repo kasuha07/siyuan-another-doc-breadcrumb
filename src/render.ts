@@ -81,12 +81,19 @@ export function createBreadcrumbArrow(entry: BreadcrumbEntry, controller: Action
 }
 
 /**
- * 装饰性分隔符（同行模式下内容带与原生内容带之间，无交互）
+ * 装饰性分隔箭头（同行模式下内容带与原生内容带之间，无交互）
  */
 export function createBreadcrumbDivider() {
     const span = document.createElement("span");
     span.className = "og-fdb-inline__divider";
     span.setAttribute("aria-hidden", "true");
+
+    const svgNS = "http://www.w3.org/2000/svg";
+    const svg = document.createElementNS(svgNS, "svg");
+    const use = document.createElementNS(svgNS, "use");
+    use.setAttributeNS("http://www.w3.org/1999/xlink", "xlink:href", "#iconRight");
+    svg.appendChild(use);
+    span.appendChild(svg);
 
     return span;
 }
