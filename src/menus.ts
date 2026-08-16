@@ -246,7 +246,6 @@ export async function openRelativeMenu({ protyle, anchorElement, parentId, nextI
                 title="${docName}">
                 ${trimedName}
             </span>`,
-            accelerator: nextId == currSibling.id ? "<-" : undefined,
             current: nextId == currSibling.id
         };
 
