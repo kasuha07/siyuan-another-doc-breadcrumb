@@ -3,7 +3,7 @@
  * 通过 protyle.breadcrumb.element 精确定位原生 bar（不使用模糊 querySelector）。
  * 原生每次 render 都会重写 bar 的 innerHTML，dataset 丢失后此处会重新绑定。
  */
-import { Menu, openTab, showMessage } from "siyuan";
+import { Menu, openTab } from "siyuan";
 import { CONSTANTS } from "./constants";
 import { logPush, errorPush } from "./logger";
 import { state } from "./state";
@@ -42,6 +42,17 @@ function buildHeadingChildrenIndex(outlineData: any[]): Map<string, any[]> {
 }
 
 const NATIVE_CHILDREN_MENU_PREFIX = "breadcrumb-children-";
+const nativeArrowClickBypass = new WeakSet<HTMLElement>();
+
+function openNativeArrowMenu(arrowElement: HTMLElement) {
+    if (!arrowElement.isConnected) {
+        return;
+    }
+    // 插件监听器位于原生 Breadcrumb 监听器之前；回退时重新触发一次点击，
+    // 让原生监听器继续执行，同时避免本监听器再次拦截。
+    nativeArrowClickBypass.add(arrowElement);
+    arrowElement.click();
+}
 
 function getClosestHTMLElement(target: EventTarget | null, selector: string) {
     if (!(target instanceof Element)) {
@@ -166,6 +177,9 @@ export function addBlockBdMenuListener(protyle: any, signal: AbortSignal) {
         if (!arrowElement) {
             return;
         }
+        if (nativeArrowClickBypass.delete(arrowElement)) {
+            return;
+        }
         // 获取箭头左侧的面包屑项目
         const precedingItem = arrowElement.previousElementSibling;
         const standaloneDocumentBridge = !precedingItem
@@ -225,7 +239,7 @@ export function addBlockBdMenuListener(protyle: any, signal: AbortSignal) {
             if (outlineData == null) {
                 state.g_relativeMenu = null;
                 logPush("获取大纲数据失败或文档无大纲。");
-                showMessage(state.language["nothingToDisplay"] + "--- 另一个文档面包屑");
+                openNativeArrowMenu(arrowElement);
                 return;
             }
             // 一次性建立整棵标题树的子标题索引（结构与字段契约见 buildHeadingChildrenIndex）
@@ -248,7 +262,7 @@ export function addBlockBdMenuListener(protyle: any, signal: AbortSignal) {
             } else {
                 logPush(`点击了非文档或标题图标 (${iconHref}) 旁的箭头，不作处理。`);
                 state.g_relativeMenu = null;
-                showMessage(state.language["nothingToDisplay"] + "--- 另一个文档面包屑");
+                openNativeArrowMenu(arrowElement);
                 return;
             }
 
@@ -317,13 +331,14 @@ export function addBlockBdMenuListener(protyle: any, signal: AbortSignal) {
             } else {
                 state.g_relativeMenu = null;
                 logPush("没有可供显示的菜单项。");
-                showMessage(state.language["nothingToDisplay"] + "--- 另一个文档面包屑");
+                openNativeArrowMenu(arrowElement);
             }
 
         } catch (error) {
             errorPush("获取或处理大纲数据时出错:", error);
             if (state.g_relativeMenu && state.g_relativeMenu["id"] === menuId) {
                 state.g_relativeMenu = null;
+                openNativeArrowMenu(arrowElement);
             }
         }
     };
