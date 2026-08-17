@@ -6,9 +6,11 @@
 
 > **分叉声明**：本插件是 [OpaqueGlass/syplugin-fakeDocBreadcrumb](https://github.com/OpaqueGlass/syplugin-fakeDocBreadcrumb) 的分叉，采用 [AGPL-3.0](LICENSE) 许可证。版权归 OpaqueGlass 所有，修改部分版权归霞葉（kasuha）。
 
-> 当前版本：v1.0.5
+> 当前版本：v1.0.6
 > - 分家自 syplugin-fakeDocBreadcrumb v1.5.1，更名另起炉灶；
 > - 页签关闭走公开 API、菜单懒加载容器级监听、批量请求合并降级、设置校验与迁移保留、样式迁移官方 pluginsStyle 机制；
+> - 新增原生块面包屑左键跳转设置（默认关闭，右键行为保持不变）；同行模式复用思源原生箭头并移除重复的原生当前文档节点；
+> - 插件箭头菜单无可显示层级时回退到思源原生面包屑菜单；
 >
 > 详见[更新日志](CHANGELOG.md)
 
