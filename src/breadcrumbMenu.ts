@@ -41,6 +41,101 @@ function buildHeadingChildrenIndex(outlineData: any[]): Map<string, any[]> {
     return index;
 }
 
+const NATIVE_CHILDREN_MENU_PREFIX = "breadcrumb-children-";
+
+function getClosestHTMLElement(target: EventTarget | null, selector: string) {
+    if (!(target instanceof Element)) {
+        return null;
+    }
+    const element = target.closest(selector);
+    return element instanceof HTMLElement ? element : null;
+}
+
+function isNativeBreadcrumbJumpEnabled() {
+    return state.g_setting.nativeBreadcrumbJump === true;
+}
+
+function getNativeBreadcrumbItem(target: EventTarget | null, breadcrumbBar: HTMLElement) {
+    const item = getClosestHTMLElement(target, ".protyle-breadcrumb__item");
+    if (!item || !breadcrumbBar.contains(item)) {
+        return null;
+    }
+    // 同行模式中插件当前文档项也复用了原生 class，但它仍由插件自己的
+    // 文档导航处理，不能被“原生块面包屑”开关劫持。
+    if (item.closest(`.${CONSTANTS.INLINE_BREADCRUMB_CLASS_NAME}`)) {
+        return null;
+    }
+    return item;
+}
+
+function getNativeChildrenMenuInfo(target: EventTarget | null) {
+    const item = getClosestHTMLElement(target, ".b3-menu__item");
+    const menu = item?.closest("#commonMenu");
+    if (!(item && menu instanceof HTMLElement)) {
+        return null;
+    }
+    const menuName = menu.getAttribute("data-name") ?? "";
+    if (!menuName.startsWith(NATIVE_CHILDREN_MENU_PREFIX)) {
+        return null;
+    }
+    return {
+        item,
+        parentId: menuName.substring(NATIVE_CHILDREN_MENU_PREFIX.length),
+    };
+}
+
+function isNativeChildrenMenuForProtyle(menuParentId: string, protyle: any) {
+    const breadcrumbBar = protyle?.breadcrumb?.element;
+    if (!(breadcrumbBar instanceof HTMLElement) || !menuParentId) {
+        return false;
+    }
+    return Array.from(breadcrumbBar.querySelectorAll<HTMLElement>(".protyle-breadcrumb__item"))
+        .some(item => item.dataset.nodeId === menuParentId);
+}
+
+function findLoadedBlock(protyle: any, blockId: string) {
+    const wysiwyg = protyle?.wysiwyg?.element;
+    if (!(wysiwyg instanceof HTMLElement)) {
+        return null;
+    }
+    return Array.from(wysiwyg.querySelectorAll<HTMLElement>("[data-node-id]"))
+        .find(element => element.dataset.nodeId === blockId && element.clientHeight > 0) ?? null;
+}
+
+/**
+ * 执行原生块面包屑的“跳转”或“聚焦”。
+ *
+ * 跳转优先对已加载块直接滚动，避免 openTab 在同一已打开文档中只切换页签
+ * 而不重新滚动；未加载块再交给思源的 cb-get-scroll 处理。聚焦路径使用
+ * cb-get-focus + cb-get-scroll，与插件原有大纲菜单行为一致。
+ */
+function openNativeBreadcrumbTarget(protyle: any, blockId: string, focus: boolean) {
+    if (!blockId) {
+        return;
+    }
+    if (!focus) {
+        const loadedBlock = findLoadedBlock(protyle, blockId);
+        if (loadedBlock) {
+            loadedBlock.scrollIntoView({block: "center", inline: "nearest"});
+            return;
+        }
+    }
+    openTab({
+        app: getPluginInstance().app,
+        doc: {
+            id: blockId,
+            action: focus ? ["cb-get-focus", "cb-get-scroll"] : ["cb-get-scroll"],
+        } as any,
+        afterOpen: () => {
+            protyle?.breadcrumb?.render?.(protyle);
+        },
+    });
+}
+
+function closeCommonMenu() {
+    (window.siyuan?.menus?.menu as any)?.remove?.();
+}
+
 export function addBlockBdMenuListener(protyle: any, signal: AbortSignal) {
     // 限制范围，避免影响插件插入的面包屑
     const breadcrumbBar = protyle?.breadcrumb?.element;
@@ -52,6 +147,19 @@ export function addBlockBdMenuListener(protyle: any, signal: AbortSignal) {
     }
     breadcrumbBar.dataset["ogFdbAddedEl"] = "true";
     const docId = protyle.block.rootID;
+    const onNativeItemClick = (event: MouseEvent) => {
+        const item = getNativeBreadcrumbItem(event.target, breadcrumbBar);
+        if (!item) {
+            return;
+        }
+        if (!isNativeBreadcrumbJumpEnabled() || event.button !== 0) {
+            return;
+        }
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        event.stopPropagation();
+        openNativeBreadcrumbTarget(protyle, item.dataset.nodeId ?? "", false);
+    };
     const onClick = async (event: any) => {
         // 使用 .closest() 判断点击的是否是箭头或其内部元素
         const arrowElement = event.target.closest('.protyle-breadcrumb__arrow');
@@ -163,19 +271,11 @@ export function addBlockBdMenuListener(protyle: any, signal: AbortSignal) {
                             event.stopImmediatePropagation();
                             event.stopPropagation();
                             if (blocId) {
-                                openTab({
-                                    app: getPluginInstance().app,
-                                    // 不能带 keepCursor：目标已打开时 switchEditor 首行直接 return，
-                                    // 既不切 tab 也不执行 cb-get-focus 定位（对照 siyuan editor/util.ts switchEditor）
-                                    doc: {
-                                        id: blocId,
-                                        action: ["cb-get-focus", "cb-get-scroll"],
-                                    } as any,
-                                    afterOpen: () => {
-                                        // 更新breadcrumb
-                                        protyle?.breadcrumb?.render(protyle);
-                                    }
-                                });
+                                openNativeBreadcrumbTarget(
+                                    protyle,
+                                    blocId,
+                                    !isNativeBreadcrumbJumpEnabled(),
+                                );
                             }
                         }
                     };
@@ -227,7 +327,29 @@ export function addBlockBdMenuListener(protyle: any, signal: AbortSignal) {
             }
         }
     };
+    const onMenuClick = (event: MouseEvent) => {
+        if (!isNativeBreadcrumbJumpEnabled()) {
+            return;
+        }
+        const menuInfo = getNativeChildrenMenuInfo(event.target);
+        if (!menuInfo || !isNativeChildrenMenuForProtyle(menuInfo.parentId, protyle)) {
+            return;
+        }
+        // 带块 ID 的项（包括仍有子菜单的层级项）左键都改为跳转；
+        // “加载更多”等没有块 ID 的功能项继续交给思源处理。
+        const blockId = menuInfo.item.dataset.id;
+        if (!blockId) {
+            return;
+        }
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        event.stopPropagation();
+        closeCommonMenu();
+        openNativeBreadcrumbTarget(protyle, blockId, false);
+    };
     // 监听器生命周期绑定在 controller 的 AbortController 上：插件卸载或
     // controller 销毁时自动移除，避免原生 bar 上残留旧闭包（重载后仍响应点击）
+    breadcrumbBar.addEventListener('click', onNativeItemClick, {capture: true, signal});
     breadcrumbBar.addEventListener('click', onClick, { signal });
+    breadcrumbBar.ownerDocument.addEventListener('click', onMenuClick, {capture: true, signal});
 }

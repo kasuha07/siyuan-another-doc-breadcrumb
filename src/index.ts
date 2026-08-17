@@ -274,6 +274,7 @@ export class FakeDocBreadcrumb extends Plugin {
             new SettingProperty("foldedFrontShow", "NUMBER", [0, 8]),
             new SettingProperty("foldedEndShow", "NUMBER", [0, 8]),
             new SettingProperty("usePluginArrow", "SWITCH", null),
+            new SettingProperty("nativeBreadcrumbJump", "SWITCH", null),
             new SettingProperty("icon", "SELECT", [
                 { value: 0 },
                 { value: 1 },

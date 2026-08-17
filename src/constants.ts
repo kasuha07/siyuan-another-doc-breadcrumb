@@ -38,7 +38,7 @@ export const CONSTANTS = {
 }
 
 export const g_setting_default = {
-    "@version": 20260807,
+    "@version": 20260817,
     "nameMaxLength": 15,
     "docMaxNum": 128,
     "showNotebook": true,
@@ -46,6 +46,7 @@ export const g_setting_default = {
     "foldedEndShow": 3,
     "oneLineBreadcrumb": true,
     "usePluginArrow": true, // 使用挂件>箭头
+    "nativeBreadcrumbJump": false, // 原生块面包屑左键跳转，右键保持原有行为
     "icon": 1,
     "menuExtendSubDocDepth": 2,
     "showRoot": false,
@@ -67,6 +68,8 @@ export let zh_CN: { [key: string]: string } = {
     "setting_showAdjacentDocButton_desp": "在文档面包屑右侧显示上一篇文档和下一篇文档按钮；按文件树顺序在同一层级深度的文档之间跳转。",
     "setting_replaceAdjacentDocTab_name": "在当前位置打开上一篇/下一篇",
     "setting_replaceAdjacentDocTab_desp": "点击上一篇/下一篇按钮时，替换当前打开的页签而不是打开新页签；固定页签不会被替换，按住 Ctrl/Alt/Shift 点击时仍保留当前页签。",
+    "setting_nativeBreadcrumbJump_name": "原生块面包屑左键跳转",
+    "setting_nativeBreadcrumbJump_desp": "启用后，点击思源原生块面包屑及其展开层级时滚动跳转到对应位置；右键行为保持思源原有行为。",
     "createDocFailed": "创建文档失败",
     "previous_doc": "上一篇文档",
     "next_doc": "下一篇文档",

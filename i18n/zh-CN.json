@@ -15,6 +15,8 @@
     "setting_foldedEndShow_desp": "",
     "setting_usePluginArrow_name": "覆盖主题的面包屑分隔符\">\"样式",
     "setting_usePluginArrow_desp": "对于部分将面包屑分隔符\">\"显示为\"/\"的主题，点击分隔符不能展示子文档菜单。启用此项将解决此问题。",
+    "setting_nativeBreadcrumbJump_name": "原生块面包屑左键跳转",
+    "setting_nativeBreadcrumbJump_desp": "启用后，点击思源原生块面包屑及其展开层级时滚动跳转到对应位置；右键行为保持思源原有行为。",
     "setting_mainRetry_name": "超时重试次数",
     "setting_mainRetry_desp": "如果未能显示，将间隔200ms进行重试。由于新创建的文档未入数据库，该设置对新创建的文档无效。",
     "setting_batchFixFocusError_name": "自动修复错误（批量进行）",

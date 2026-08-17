@@ -30,6 +30,7 @@ export const state: StateShape = {
         "foldedEndShow": null,
         "oneLineBreadcrumb": null,
         "usePluginArrow": null,
+        "nativeBreadcrumbJump": null,
         "icon": null,
         "menuExtendSubDocDepth": null,
         "showRoot": null,

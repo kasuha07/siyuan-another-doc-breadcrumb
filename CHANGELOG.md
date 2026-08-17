@@ -1,5 +1,9 @@
 ## 更新日志
 
+### 未发布
+
+- 新增设置：启用后，SiYuan 原生块面包屑及其展开层级左键滚动跳转到对应位置，右键行为保持原有行为；默认关闭。
+
 ### v1.0.5 (2026年8月6日)
 
 - 修复：页签关闭弃用 protyle.model.parent.parent 私有链，改用 getAllTabs + tab.parent.removeTab 公开结构，保留 pin 检查与结构探测告警；
