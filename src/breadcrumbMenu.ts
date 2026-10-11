@@ -191,30 +191,38 @@ export function addBlockBdMenuListener(protyle: any, signal: AbortSignal) {
             logPush("未找到箭头左侧的面包屑项目。");
             return;
         }
-        // 同行模式将原生块箭头移动到插件当前文档项之后；该项没有原生
-        // popover 图标，交给思源 Breadcrumb 自身继续处理块层级菜单。
-        if (precedingItem?.closest(`.${CONSTANTS.INLINE_BREADCRUMB_CLASS_NAME}`)) {
+        // 两行模式移除了原生文档首项，独立箭头没有 previousElementSibling，
+        // 原生无法识别，始终回退到插件大纲；其余箭头由设置决定是否介入。
+        if (state.g_setting.headingOutlineMenu !== true && !standaloneDocumentBridge) {
             return;
         }
-        const afterItem = arrowElement.nextElementSibling;
+        // 同行模式桥接箭头前的插件当前项只有 data-node-id，没有 popover 图标。
+        // 开启大纲菜单时按文档处理，使文档箭头与标题箭头遵循同一个开关。
+        const inlineDocumentBridge = !!precedingItem?.closest(`.${CONSTANTS.INLINE_BREADCRUMB_CLASS_NAME}`)
+            && precedingItem.dataset.nodeId === docId;
+        const documentBridge = standaloneDocumentBridge || inlineDocumentBridge;
+        // 同行文档箭头位于 root 末尾，后续原生块项是 root 的兄弟节点。
+        const afterItem = inlineDocumentBridge
+            ? arrowElement.parentElement?.nextElementSibling
+            : arrowElement.nextElementSibling;
         let nextNodeId = "";
         if (afterItem && (standaloneDocumentBridge || precedingItem?.classList.contains('protyle-breadcrumb__item'))) {
             nextNodeId = afterItem.dataset.nodeId;
         }
         // 提取 Node ID 和图标信息
-        const nodeId = standaloneDocumentBridge ? docId : precedingItem?.dataset.nodeId;
-        const iconUseElement = standaloneDocumentBridge
+        const nodeId = documentBridge ? docId : precedingItem?.dataset.nodeId;
+        const iconUseElement = documentBridge
             ? null
             : precedingItem?.querySelector('svg.popover__block use');
 
-        if (!nodeId || (!standaloneDocumentBridge && !iconUseElement)) {
+        if (!nodeId || (!documentBridge && !iconUseElement)) {
             logPush("无法从面包屑项目中提取 node-id 或 icon。");
             return;
         }
         event.stopImmediatePropagation();
         event.stopPropagation();
         event.preventDefault();
-        const iconHref = standaloneDocumentBridge
+        const iconHref = documentBridge
             ? '#iconFile'
             : iconUseElement.getAttributeNS('http://www.w3.org/1999/xlink', 'href');
 

@@ -11,7 +11,7 @@ import { saveLayout } from "siyuan";
 import { CONSTANTS } from "./constants";
 import { debugPush, errorPush, warnPush } from "./logger";
 import { state } from "./state";
-import { isNotebookDocEnabled, isValidStr } from "./utils";
+import { isCurrentVersionLessThan, isNotebookDocEnabled, isValidStr } from "./utils";
 import { openRefLinkAgent } from "./api";
 import { buildDocumentBreadcrumbModel } from "./model";
 import { renderBreadcrumbFragment, createBreadcrumbArrow } from "./render";
@@ -242,6 +242,7 @@ export class InlineBreadcrumbController {
         this.handleClick = this.handleClick.bind(this);
         this.handleAuxClick = this.handleAuxClick.bind(this);
         this.handleContextMenu = this.handleContextMenu.bind(this);
+        this.handleKeyDown = this.handleKeyDown.bind(this);
         this.handleWheel = this.handleWheel.bind(this);
     }
 
@@ -333,7 +334,12 @@ export class InlineBreadcrumbController {
 
         eventTarget.addEventListener("click", this.handleClick, { signal });
         eventTarget.addEventListener("auxclick", this.handleAuxClick, { signal });
-        eventTarget.addEventListener("contextmenu", this.handleContextMenu, { signal });
+        // v3.8.0 起原生也在同一 bar 上监听右键/键盘，且注册早于插件。
+        // 捕获阶段仅隔离插件 action，不影响桥接进 root 的原生块箭头。
+        eventTarget.addEventListener("contextmenu", this.handleContextMenu, { signal, capture: true });
+        if (!isCurrentVersionLessThan("3.8.0")) {
+            eventTarget.addEventListener("keydown", this.handleKeyDown, { signal, capture: true });
+        }
 
         if (!this.nativeBar) {
             // 两行模式：插件根节点自身滚动，处理滚轮；
@@ -352,7 +358,7 @@ export class InlineBreadcrumbController {
         const signal = this.abortController.signal;
         nav.addEventListener("click", this.handleClick, { signal });
         nav.addEventListener("auxclick", this.handleAuxClick, { signal });
-        nav.addEventListener("contextmenu", this.handleContextMenu, { signal });
+        nav.addEventListener("contextmenu", this.handleContextMenu, { signal, capture: true });
     }
 
     /**
@@ -603,7 +609,56 @@ export class InlineBreadcrumbController {
         }
 
         event.preventDefault();
-        event.stopPropagation();
+        event.stopImmediatePropagation();
+    }
+
+    handleKeyDown(event: KeyboardEvent) {
+        // 与原生一致：输入法、组合键和已打开菜单的键盘操作不介入。
+        if (event.isComposing || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) {
+            return;
+        }
+        const menuElement = window.siyuan.menus?.menu?.element;
+        if (menuElement && !menuElement.classList.contains("fn__none")) {
+            return;
+        }
+        if (!(event.target instanceof Element)) {
+            return;
+        }
+        const item = event.target.closest<HTMLElement>(".protyle-breadcrumb__item");
+        const container = this.nativeBar ?? this.root;
+        if (!item || !container?.contains(item)) {
+            return;
+        }
+        const pluginTarget = this.getActionTarget(event);
+        const items = Array.from(container.querySelectorAll<HTMLElement>(".protyle-breadcrumb__item"));
+        const index = items.indexOf(item);
+        const nextItem = event.key === "ArrowRight" ? items[index + 1]
+            : event.key === "ArrowLeft" ? items[index - 1] : null;
+        // 原生首项向左跨回插件时也需接管：原生只查直接兄弟，无法进入 root。
+        // 原生项之间的操作继续由原生监听器处理。
+        if (!pluginTarget && !(nextItem && this.root?.contains(nextItem))) {
+            return;
+        }
+        event.stopImmediatePropagation();
+        if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
+            event.preventDefault();
+            if (nextItem) {
+                // 复刻原生 focusItem 的 roving tabindex 与滚动行为。
+                items.forEach(element => element.setAttribute("tabindex", element === nextItem ? "0" : "-1"));
+                nextItem.focus({ preventScroll: true });
+                nextItem.scrollIntoView({ block: "nearest", inline: "nearest" });
+            }
+        } else if (event.key === "ArrowDown" && pluginTarget) {
+            event.preventDefault();
+            const action = this.actions.get((pluginTarget as HTMLElement).dataset.ogFdbActionKey as string);
+            if (action?.type === "open-document") {
+                this.dispatchAction({ type: "open-relative-menu", entry: action.entry }, pluginTarget, event);
+            } else if (action?.type === "open-collapsed-menu") {
+                this.dispatchAction(action, pluginTarget, event);
+            }
+        }
+        // Enter / Space 保留 button 默认 click，沿用现有文档打开逻辑；
+        // 不 preventDefault，避免原生 Enter 分支吞掉激活或产生双次点击。
     }
 
     handleWheel(event: WheelEvent) {

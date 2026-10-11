@@ -31,6 +31,7 @@ export const state: StateShape = {
         "oneLineBreadcrumb": null,
         "usePluginArrow": null,
         "nativeBreadcrumbJump": null,
+        "headingOutlineMenu": null,
         "icon": null,
         "menuExtendSubDocDepth": null,
         "showRoot": null,

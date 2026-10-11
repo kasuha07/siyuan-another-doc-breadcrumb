@@ -18,6 +18,8 @@
 - Add the current document navigation path above the editor;
 - Click to jump to the corresponding document, right-click to expand the sub-documents of that document;
 - (Setting) Enable "Left-click navigation for the native block breadcrumb" to scroll to the corresponding position from the native block breadcrumb and its expanded hierarchy; right-click behavior remains unchanged (disabled by default);
+- (Setting) "Show outline menus for document/heading arrows" shows heading-only menus for native document and heading arrows. Disabled by default on SiYuan v3.8.0+ to use native child-block navigation, including pagination and lazy submenus; enabled by default on v3.7.x. Saved choices are preserved. The standalone document arrow in two-line mode always falls back to the outline menu because its native document item has been removed;
+- On SiYuan v3.8.0+, use Enter / Space to activate plugin path buttons, ArrowDown to open their sub-document menu, and ArrowLeft / ArrowRight to move between path items (including across the plugin/native boundary in one-line mode);
 - (Setting) The sub-document menu supports further expansion according to the hierarchy, up to 7 levels;
 - (Setting) When the hierarchy exceeds 5 levels, the first 2 levels and the last 3 levels are retained by default;
 - (Setting) Show previous/next document buttons on the right side of the breadcrumb;

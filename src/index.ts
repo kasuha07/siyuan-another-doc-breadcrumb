@@ -28,7 +28,15 @@ import { generateSettingPanel, loadUISettings, SettingProperty } from "./setting
 import { destroyAllControllers } from "./controller";
 import { removeAdjacentTooltip } from "./adjacent";
 import { eventBusHandler, handleDestroyProtyle, mainEventBusHander, refreshAllShowingProtyles, resetEventState } from "./events";
-import { isMobile, isSomePluginExist, sleep } from "./utils";
+import { isCurrentVersionLessThan, isMobile, isSomePluginExist, sleep } from "./utils";
+
+/**
+ * 未保存过大纲开关时按运行时版本取默认值；不在模块加载阶段访问 window。
+ * 新增布尔键不需要升配置版本，已有显式选择（含 false）始终优先。
+ */
+function getSettingDefaults() {
+    return { ...g_setting_default, headingOutlineMenu: isCurrentVersionLessThan("3.8.0") };
+}
 
 /**
  * 校验 loadData 原始载荷是否为有效配置对象：
@@ -88,7 +96,7 @@ export class FakeDocBreadcrumb extends Plugin {
         state.language = this.i18n;
         state.g_pluginInstance = this;
         // 读取配置
-        Object.assign(state.g_setting, g_setting_default);
+        Object.assign(state.g_setting, getSettingDefaults());
         // 冲突插件强制同行模式（onload 早期应用一次，配置加载/保存后由
         // applyConflictPluginOverride 再次强制，防止被磁盘配置绕过）
         this.applyConflictPluginOverride();
@@ -133,7 +141,7 @@ export class FakeDocBreadcrumb extends Plugin {
             // 需先转换为新枚举，否则会被按当前 string 类型误判为非法剔除
             let migrated = false;
             if (settingCache["@version"] === undefined || settingCache["@version"] < g_setting_default["@version"]) {
-                const merged: { [key: string]: any } = { ...g_setting_default };
+                const merged: { [key: string]: any } = getSettingDefaults();
                 for (const key of Object.keys(g_setting_default)) {
                     if (key in settingCache && settingCache[key] !== undefined) {
                         merged[key] = settingCache[key];
@@ -275,6 +283,7 @@ export class FakeDocBreadcrumb extends Plugin {
             new SettingProperty("foldedEndShow", "NUMBER", [0, 8]),
             new SettingProperty("usePluginArrow", "SWITCH", null),
             new SettingProperty("nativeBreadcrumbJump", "SWITCH", null),
+            new SettingProperty("headingOutlineMenu", "SWITCH", null),
             new SettingProperty("icon", "SELECT", [
                 { value: 0 },
                 { value: 1 },
