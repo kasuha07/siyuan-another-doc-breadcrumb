@@ -7,9 +7,17 @@ import { state } from "./state";
 import { getAdjacentDocs } from "./adjacent";
 import { getCurrentDocDetail, getDocInfo, getDocsInfo, getHPathByID, getNotebooks } from "./api";
 import { getListDocsByPathAPIFilePath, isNotebookDoc, isNotebookDocEnabled, isValidStr } from "./utils";
-import type { BreadcrumbEntry, BreadcrumbModel, PathObject } from "./types";
+import type { AdjacentResult, BreadcrumbEntry, BreadcrumbModel, PathObject } from "./types";
 
-export async function buildDocumentBreadcrumbModel(protyle: any, documentId: string): Promise<BreadcrumbModel | null> {
+/**
+ * 构建面包屑路径模型；相邻文档不在此等待：
+ * 同层级深度模式可能串行请求多次 listDocsByPath，若等待它会拖慢路径首次显示。
+ * 返回的 loadAdjacent 由 controller 在路径渲染后异步调用；关闭相邻导航时为 null。
+ */
+export async function buildDocumentBreadcrumbModel(protyle: any, documentId: string): Promise<{
+    model: BreadcrumbModel;
+    loadAdjacent: (() => Promise<AdjacentResult>) | null;
+} | null> {
     const docDetail = await getCurrentDocDetail(documentId, protyle);
     if (!isValidStr(docDetail)) {
         logPush("数据库中找不到当前打开的文档");
@@ -25,15 +33,19 @@ export async function buildDocumentBreadcrumbModel(protyle: any, documentId: str
     const notebookDocFlag = isNotebookDoc(docDetail.path, docDetail.box);
     const entries = await buildEntriesFromPath(pathObjects, docDetail);
 
-    let adjacent = null;
-    if (state.g_setting.showAdjacentDocButton !== CONSTANTS.ADJ_NONE) {
-        adjacent = await getAdjacentDocs(pathObjects, notebookDocFlag);
-    }
+    const loadAdjacent = state.g_setting.showAdjacentDocButton !== CONSTANTS.ADJ_NONE
+        ? () => getAdjacentDocs(pathObjects, notebookDocFlag)
+        : null;
 
     return {
-        documentId,
-        entries,
-        adjacent
+        model: {
+            documentId,
+            box: docDetail.box ?? "",
+            path: docDetail.path ?? "",
+            entries,
+            adjacent: null,
+        },
+        loadAdjacent,
     };
 }
 

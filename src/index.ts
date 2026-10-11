@@ -251,6 +251,7 @@ export class FakeDocBreadcrumb extends Plugin {
                 const prevOneLine = state.g_setting.oneLineBreadcrumb;
                 Object.assign(state.g_setting, uiSettings);
                 this.applyConflictPluginOverride();
+                state.g_settingVersion += 1;
                 // 仅同行/两行切换需要销毁重建挂载结构，其余设置由 refresh
                 // 按模型指纹变化重建内容；样式已由官方机制托管，无需重注入
                 if (state.g_setting.oneLineBreadcrumb !== prevOneLine) {

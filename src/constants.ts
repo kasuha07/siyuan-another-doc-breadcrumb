@@ -18,6 +18,7 @@ export const CONSTANTS = {
     PLUGIN_NAME: "og_fake_doc_breadcrumb",
     SAVE_TIMEOUT: 900,
     SETTING_LOAD_TIMEOUT: 5000, // 读取配置超时兜底：官方 fetchPost 异常时可能永不回调
+    BREADCRUMB_MODEL_TTL_MS: 60000, // 切页签复用模型；无结构通知的图标等变化由 TTL 兜底
     CONTAINER_CLASS_NAME: "og-fake-doc-breadcrumb-container",
     INLINE_BREADCRUMB_CLASS_NAME: "og-fdb-inline-breadcrumb",
     HOST_STATE_CLASS_NAME: "og-fdb-inline-host",

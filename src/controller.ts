@@ -18,7 +18,14 @@ import { renderBreadcrumbFragment, createBreadcrumbArrow } from "./render";
 import { createAdjacentDocNav, clickAdjacentDocButton, removeAdjacentTooltip } from "./adjacent";
 import { openHideMenu, openRelativeMenu } from "./menus";
 import { addBlockBdMenuListener } from "./breadcrumbMenu";
-import type { BreadcrumbModel, ControllerAction } from "./types";
+import type { AdjacentResult, BreadcrumbModel, ControllerAction } from "./types";
+
+const EMPTY_ADJACENT: AdjacentResult = {
+    previousDoc: null,
+    nextDoc: null,
+    sameLevelPrevious: false,
+    sameLevelNext: false,
+};
 
 /**
  * 精确获取思源原生面包屑相关节点
@@ -126,14 +133,14 @@ export function createInlineRoot() {
  * 从 O(n)（逐个压缩）降到 O(log n)；class 切换用增量指针只调整边界
  * 元素，避免每次迭代线性扫描。
  */
-export function applyBreadcrumbEllipsis(bar: HTMLElement) {
+export function applyBreadcrumbEllipsis(bar: HTMLElement): number {
     if (!bar.isConnected) {
-        return;
+        return 0;
     }
     const textElements = Array.from(bar.querySelectorAll(".protyle-breadcrumb__text"));
     const count = textElements.length;
     if (count <= 1) {
-        return;
+        return 0;
     }
     // 先清除旧标记：容器变宽后需重新完整显示，再按当前宽度重算
     textElements.forEach((item) => {
@@ -141,7 +148,7 @@ export function applyBreadcrumbEllipsis(bar: HTMLElement) {
     });
     // 全部展开也不溢出：无需压缩
     if (bar.scrollWidth <= bar.clientWidth) {
-        return;
+        return 0;
     }
 
     // 增量调整“已压缩个数”，只增删边界元素的 class
@@ -171,6 +178,7 @@ export function applyBreadcrumbEllipsis(bar: HTMLElement) {
         }
     }
     setApplied(high);
+    return high;
 }
 
 /**
@@ -209,6 +217,15 @@ export class InlineBreadcrumbController {
     documentId = "";
     lastRenderedDocId = "";
     lastModel: BreadcrumbModel | null = null;
+    /** 本 controller 的结构版本：仅当 ws-main 结构变更影响当前文档时由 events.ts 自增 */
+    structureVersion = 0;
+    /** 仅成功取数并渲染后记录；版本取自请求开始，不能用响应返回时的全局版本。 */
+    lastSuccessfulUpdate: {
+        documentId: string;
+        structureVersion: number;
+        settingVersion: number;
+        fetchedAt: number;
+    } | null = null;
     /** 最近一次 render 的内容带 DOM 快照：思源重写 bar 后 MO 恢复直接复用，避免全量重建 */
     cachedRoot: HTMLElement | null = null;
     /** 最近一次 render 的模型指纹（JSON 序列化）：内容未变时跳过重复重建 */
@@ -219,6 +236,9 @@ export class InlineBreadcrumbController {
     destroyed = false;
     /** 分屏拖拽等连续尺寸变化时，ResizeObserver 以 rAF 合并为每帧最多一次重算 */
     resizeFrame = 0;
+    /** 上次省略计算的输入签名（host 宽度 + 全部文本）与压缩个数，见 applyEllipsis */
+    ellipsisSignature = "";
+    ellipsisApplied = 0;
     root: HTMLElement | null = null;
     wrapper: HTMLElement | null = null;
     host: HTMLElement | null = null;
@@ -317,8 +337,35 @@ export class InlineBreadcrumbController {
             if (this.destroyed || !this.nativeBar?.isConnected) {
                 return;
             }
-            applyBreadcrumbEllipsis(this.nativeBar);
+            this.applyEllipsis(true);
         });
+    }
+
+    /**
+     * 同行模式省略。光标换块时思源会重写 bar，但多数情况下（同一标题下换块）
+     * 原生文本与 host 宽度都不变：此时直接按上次压缩个数恢复 class，只做一次
+     * 溢出校验，省去清空 class 与二分查找的多次强制布局；签名变化或校验
+     * 仍溢出时完整重算。host 宽度不随内容变化（bar 才是收缩项），可作签名。
+     * force：host 内其他元素（相邻导航等）宽度变化时，签名无法感知，需完整重算。
+     */
+    applyEllipsis(force = false) {
+        const bar = this.nativeBar;
+        if (!bar?.isConnected) {
+            return;
+        }
+        const texts = Array.from(bar.querySelectorAll<HTMLElement>(".protyle-breadcrumb__text"));
+        const signature = (this.host?.clientWidth ?? 0) + "|" + texts.map(text => text.textContent).join("\u0000");
+        if (!force && signature === this.ellipsisSignature) {
+            texts.forEach((text, index) => {
+                text.classList.toggle("protyle-breadcrumb__text--ellipsis", index < this.ellipsisApplied);
+            });
+            // 全部压缩后仍溢出时保留滚动，与完整计算结果一致，无需校验
+            if (this.ellipsisApplied >= texts.length || bar.scrollWidth <= bar.clientWidth) {
+                return;
+            }
+        }
+        this.ellipsisApplied = applyBreadcrumbEllipsis(bar);
+        this.ellipsisSignature = signature;
     }
 
     bindEvents() {
@@ -389,8 +436,25 @@ export class InlineBreadcrumbController {
             this.adjacentNav = nav;
             this.bindNavEvents(nav);
         }
+        nav.querySelectorAll<HTMLElement>("[data-og-fdb-action-key]").forEach((button) => {
+            this.actions.delete(button.dataset.ogFdbActionKey as string);
+        });
         nav.textContent = "";
         nav.appendChild(createAdjacentDocNav(adjacent, this));
+    }
+
+    /**
+     * 相邻文档异步返回后只更新导航：路径已先行渲染，结果未变时不重建。
+     * 同行模式下导航宽度变化会挤压 bar，需重算省略。
+     */
+    applyAdjacent(adjacent: AdjacentResult) {
+        if (!this.lastModel || JSON.stringify(adjacent) === JSON.stringify(this.lastModel.adjacent)) {
+            return;
+        }
+        removeAdjacentTooltip();
+        this.lastModel.adjacent = adjacent;
+        this.syncAdjacentNav();
+        this.scheduleBreadcrumbEllipsis();
     }
 
     /**
@@ -515,7 +579,7 @@ export class InlineBreadcrumbController {
         // 同行模式：空间不足时恢复思源原生省略机制
         // （原生块面包屑每次移块都会变化，省略状态必须重算）
         if (this.nativeBar) {
-            applyBreadcrumbEllipsis(this.nativeBar);
+            this.applyEllipsis();
         }
 
         // 内容带前段重新插入插件内容后，把滚动位置向后推相应宽度，
@@ -743,7 +807,9 @@ export class InlineBreadcrumbController {
 
         return {
             revision: this.revision,
-            documentId
+            documentId,
+            structureVersion: this.structureVersion,
+            settingVersion: state.g_settingVersion,
         };
     }
 
@@ -761,16 +827,46 @@ export class InlineBreadcrumbController {
             return;
         }
 
-        const ticket = this.beginUpdate(documentId);
-
         try {
-            const model = await buildDocumentBreadcrumbModel(this.protyle, documentId);
+            const ticket = this.beginUpdate(documentId);
+            const previous = this.lastSuccessfulUpdate;
+            const canReuseDOM = this.root?.isConnected || (this.nativeBar?.isConnected && this.cachedRoot);
+            if (previous && previous.documentId === documentId
+                && previous.structureVersion === ticket.structureVersion
+                && previous.settingVersion === ticket.settingVersion
+                && Date.now() - previous.fetchedAt < CONSTANTS.BREADCRUMB_MODEL_TTL_MS
+                && canReuseDOM) {
+                // 切页签/文档内聚焦只需恢复 DOM，无需重新获取文档路径与相邻列表。
+                // 返回放在 try 内，确保 finally 中的原生菜单监听仍照常绑定。
+                if (this.nativeBar) {
+                    this.restoreInlineRoot();
+                } else {
+                    this.syncNativeDocumentBreadcrumbBridge();
+                }
+                if (this.root?.isConnected) {
+                    return;
+                }
+            }
+            const result = await buildDocumentBreadcrumbModel(this.protyle, documentId);
 
-            if (!model || !this.canCommit(ticket)) {
+            if (!result || !this.canCommit(ticket)) {
                 return;
             }
 
+            const { model, loadAdjacent } = result;
+            if (loadAdjacent) {
+                // 同文档刷新沿用已有结果，避免导航闪烁；切换文档先显示禁用占位，
+                // 不能沿用上一篇文档的上一篇/下一篇，否则加载期间点击会跳错
+                const previousAdjacent = this.lastModel?.documentId === documentId ? this.lastModel?.adjacent : null;
+                model.adjacent = previousAdjacent ?? { ...EMPTY_ADJACENT };
+            }
             this.render(model);
+            if (loadAdjacent) {
+                // 不 await：路径与原生菜单监听（finally）无需等待相邻文档
+                this.loadAdjacentAfterRender(ticket, loadAdjacent);
+            } else {
+                this.markUpdateSucceeded(ticket);
+            }
         } catch (err) {
             warnPush(err);
             errorPush(err);
@@ -784,6 +880,31 @@ export class InlineBreadcrumbController {
         }
     }
 
+    async loadAdjacentAfterRender(ticket: ReturnType<InlineBreadcrumbController["beginUpdate"]>,
+                                  loadAdjacent: () => Promise<AdjacentResult>) {
+        try {
+            const adjacent = await loadAdjacent();
+            if (!this.canCommit(ticket)) {
+                return;
+            }
+            this.applyAdjacent(adjacent);
+            // 相邻文档也成功后才记录缓存标记，否则下次切回会沿用占位结果
+            this.markUpdateSucceeded(ticket);
+        } catch (err) {
+            warnPush(err);
+            errorPush(err);
+        }
+    }
+
+    markUpdateSucceeded(ticket: ReturnType<InlineBreadcrumbController["beginUpdate"]>) {
+        this.lastSuccessfulUpdate = {
+            documentId: ticket.documentId,
+            structureVersion: ticket.structureVersion,
+            settingVersion: ticket.settingVersion,
+            fetchedAt: Date.now(),
+        };
+    }
+
     render(model: BreadcrumbModel) {
         this.lastModel = model;
 
@@ -793,7 +914,8 @@ export class InlineBreadcrumbController {
         // 指纹需并入仅影响渲染、不进模型的设置（相邻导航显示样式、文档名
         // 最大长度、图标显示方式），否则这些设置保存后指纹不变、不会触发
         // 重建，样式要等下次真实模型变化才生效。
-        const fingerprint = JSON.stringify(model)
+        const fingerprint = JSON.stringify({ documentId: model.documentId, box: model.box, path: model.path, entries: model.entries })
+            + "|adjacent=" + state.g_setting.showAdjacentDocButton
             + "|adjNavStyle=" + state.g_setting.adjacentNavStyle
             + "|nameMaxLength=" + state.g_setting.nameMaxLength
             + "|icon=" + state.g_setting.icon;
@@ -833,7 +955,7 @@ export class InlineBreadcrumbController {
 
         // 同行模式：空间不足时恢复思源原生省略机制
         if (this.nativeBar) {
-            applyBreadcrumbEllipsis(this.nativeBar);
+            this.applyEllipsis();
         }
 
         // 快照内容带 DOM：思源重写 bar 后 MO 恢复直接复用
@@ -862,6 +984,7 @@ export class InlineBreadcrumbController {
         this.adjacentNav?.remove();
         this.cachedRoot = null;
         this.lastFingerprint = null;
+        this.lastSuccessfulUpdate = null;
 
         if (this.host?.isConnected) {
             this.host.classList.remove(CONSTANTS.HOST_STATE_CLASS_NAME);
@@ -888,8 +1011,8 @@ export class InlineBreadcrumbController {
 /**
  * controller registry：WeakMap 用于查找，Set 用于遍历清理
  */
-let controllerByProtyle = new WeakMap<any, any>();
-const activeControllers = new Set<any>();
+let controllerByProtyle = new WeakMap<any, InlineBreadcrumbController>();
+const activeControllers = new Set<InlineBreadcrumbController>();
 
 export const inlineControllerRegistry = {
     ensure(protyle: any) {
@@ -898,6 +1021,8 @@ export const inlineControllerRegistry = {
             return existed;
         }
         if (existed) {
+            // 失联的旧 controller 仍持有 observer 与监听器，替换前先完整销毁
+            existed.destroy();
             controllerByProtyle.delete(protyle);
             activeControllers.delete(existed);
         }
@@ -919,6 +1044,9 @@ export const inlineControllerRegistry = {
             controllerByProtyle.delete(protyle);
             activeControllers.delete(controller);
         }
+    },
+    forEach(callback: (controller: InlineBreadcrumbController) => void) {
+        activeControllers.forEach(callback);
     },
     destroyAll() {
         for (const controller of activeControllers) {

@@ -5,8 +5,9 @@ import * as siyuan from "siyuan";
 import { debugPush, errorPush, infoPush, warnPush } from "./logger";
 import { state } from "./state";
 import { getAllShowingDocId } from "./utils";
-import { clearDocOutlineCache } from "./api";
+import { invalidateDocOutline } from "./api";
 import { destroyAllControllers, inlineControllerRegistry } from "./controller";
+import { invalidateAdjacentDocCache, isModelAffected, parseStructureChange } from "./structure";
 
 /**
  * loaded-protyle-static / switch-protyle 双事件去重：
@@ -65,7 +66,7 @@ function flushStructureRefresh() {
     if (protyles.length === 0) {
         return;
     }
-    state.g_adjacentDocCache = {};
+    // 相邻文档缓存已在 eventBusHandler 中按变化目录精确失效
     // 并行刷新替代原串行 await；main 内部自带异常兜底，这里 catch 兜底防未处理拒绝
     protyles.forEach((protyle) => {
         main(protyle).catch((err) => errorPush(err));
@@ -98,28 +99,40 @@ export function eventBusHandler(detail: any) {
     // ws-main 为高频事件（输入时每次事务保存都会推送 savedoc），
     // 必须先做 cmd 过滤，非目标消息直接返回，避免任何开销。
     const cmd = detail?.detail?.cmd;
+    const data = detail?.detail?.data;
+    // savedoc：正文保存，仅失效该文档的大纲缓存（Map 删除，开销可忽略）
+    if (cmd === "savedoc") {
+        if (typeof data?.rootID === "string") {
+            invalidateDocOutline(data.rootID);
+        }
+        return;
+    }
     // create：新建文档（含标题/列表转文档等路径，内核统一走 PushCreate →
     // NewCmdResult("create")，见 kernel/model/push_reload.go，思源前端 Files.ts 同款监听）。
     // 新建文档会改变同层/相邻文档列表，必须失效相邻文档缓存，否则 3 分钟 TTL 内
     // 上一篇/下一篇会跳过新文档。
-    if (!["create", "moveDoc", "rename", "removeDoc", "filetreeSortChanged"].includes(cmd)) {
+    // 笔记本重命名同样改变文档路径显示（kernel/model/file.go 广播 renamenotebook）。
+    // 文档图标走通用 transactions/updateAttrs，无独立主连接 cmd，暂由模型 TTL 兜底。
+    const change = parseStructureChange(cmd, data);
+    if (!change) {
         return;
     }
     try {
-        debugPush("检查刷新中（由创建、重命名、移动或删除触发）");
+        debugPush("检查刷新中（由创建、重命名、移动或删除触发）", change);
+        invalidateAdjacentDocCache(change);
 
-        // 结构变更（创建/重命名/移动/删除）会影响大纲标题名，主动失效大纲缓存
-        clearDocOutlineCache();
-
-        const allEditor = siyuan.getAllEditor();
-        const ids = getAllShowingDocId();
-        if (ids != null && ids.length > 0) {
-            for (let editor of allEditor) {
-                if (ids.includes(editor.protyle.block.rootID)) {
-                    scheduleStructureRefresh(editor.protyle);
-                }
+        const ids = getAllShowingDocId() ?? [];
+        inlineControllerRegistry.forEach((controller) => {
+            // 只失效受影响的 controller：必须先失效再调度刷新，请求期间到达的
+            // 事件也不能被旧请求的缓存标记覆盖；未受影响的后台页签切回时继续复用模型
+            if (!isModelAffected(controller.lastModel, change)) {
+                return;
             }
-        }
+            controller.structureVersion += 1;
+            if (ids.includes(controller.protyle?.block?.rootID)) {
+                scheduleStructureRefresh(controller.protyle);
+            }
+        });
     } catch (err) {
         errorPush(err);
     }

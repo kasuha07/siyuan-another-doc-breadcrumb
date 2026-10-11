@@ -110,8 +110,9 @@ function findLoadedBlock(protyle: any, blockId: string) {
     if (!(wysiwyg instanceof HTMLElement)) {
         return null;
     }
-    return Array.from(wysiwyg.querySelectorAll<HTMLElement>("[data-node-id]"))
-        .find(element => element.dataset.nodeId === blockId && element.clientHeight > 0) ?? null;
+    // 按属性选择器只取同 id 节点（嵌入块等场景可能重复），不再遍历整篇文档的全部块
+    return Array.from(wysiwyg.querySelectorAll<HTMLElement>(`[data-node-id="${CSS.escape(blockId)}"]`))
+        .find(element => element.clientHeight > 0) ?? null;
 }
 
 /**
@@ -177,7 +178,7 @@ function getCurrentBlockPathIDs(protyle: any, breadcrumbBar: HTMLElement, rootID
     const currentID = protyle.breadcrumb?.id;
     const wysiwyg = protyle.wysiwyg?.element as HTMLElement | undefined;
     let block = currentID && wysiwyg
-        ? Array.from(wysiwyg.querySelectorAll<HTMLElement>("[data-node-id]")).find(item => item.dataset.nodeId === currentID)
+        ? wysiwyg.querySelector<HTMLElement>(`[data-node-id="${CSS.escape(currentID)}"]`) ?? undefined
         : undefined;
     while (block && wysiwyg?.contains(block)) {
         ids.add(block.dataset.nodeId!);
@@ -313,6 +314,61 @@ async function openStandaloneDocumentChildrenMenu(protyle: any, arrow: HTMLEleme
     } finally {
         cleanup();
     }
+}
+
+/**
+ * 原生子块菜单（breadcrumb-children-*）左键跳转：菜单挂在 document 上，原先每个
+ * controller 各注册一个捕获监听，开 N 个编辑器每次点击就执行 N 次。改为全局一个
+ * 监听 + protyle 集合，按菜单所属面包屑分发；集合为空时移除监听。
+ */
+const nativeChildrenMenuProtyles = new Set<any>();
+
+function onNativeChildrenMenuClick(event: MouseEvent) {
+    if (!isNativeBreadcrumbJumpEnabled()) {
+        return;
+    }
+    const menuInfo = getNativeChildrenMenuInfo(event.target);
+    if (!menuInfo) {
+        return;
+    }
+    let protyle: any = null;
+    for (const item of nativeChildrenMenuProtyles) {
+        if (isNativeChildrenMenuForProtyle(menuInfo.parentId, item)) {
+            protyle = item;
+            break;
+        }
+    }
+    if (!protyle) {
+        return;
+    }
+    // 带块 ID 的项（包括仍有子菜单的层级项）左键都改为跳转；
+    // “加载更多”等没有块 ID 的功能项继续交给思源处理。
+    const blockId = menuInfo.item.dataset.id;
+    if (!blockId) {
+        return;
+    }
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    event.stopPropagation();
+    closeCommonMenu();
+    openNativeBreadcrumbTarget(protyle, blockId, false);
+}
+
+function registerNativeChildrenMenuProtyle(protyle: any, signal: AbortSignal) {
+    if (signal.aborted) {
+        return;
+    }
+    if (nativeChildrenMenuProtyles.size === 0) {
+        document.addEventListener("click", onNativeChildrenMenuClick, true);
+    }
+    nativeChildrenMenuProtyles.add(protyle);
+    // 生命周期仍绑定 controller 的 AbortController：销毁或卸载时移出集合
+    signal.addEventListener("abort", () => {
+        nativeChildrenMenuProtyles.delete(protyle);
+        if (nativeChildrenMenuProtyles.size === 0) {
+            document.removeEventListener("click", onNativeChildrenMenuClick, true);
+        }
+    }, { once: true });
 }
 
 export function addBlockBdMenuListener(protyle: any, signal: AbortSignal) {
@@ -523,29 +579,9 @@ export function addBlockBdMenuListener(protyle: any, signal: AbortSignal) {
             }
         }
     };
-    const onMenuClick = (event: MouseEvent) => {
-        if (!isNativeBreadcrumbJumpEnabled()) {
-            return;
-        }
-        const menuInfo = getNativeChildrenMenuInfo(event.target);
-        if (!menuInfo || !isNativeChildrenMenuForProtyle(menuInfo.parentId, protyle)) {
-            return;
-        }
-        // 带块 ID 的项（包括仍有子菜单的层级项）左键都改为跳转；
-        // “加载更多”等没有块 ID 的功能项继续交给思源处理。
-        const blockId = menuInfo.item.dataset.id;
-        if (!blockId) {
-            return;
-        }
-        event.preventDefault();
-        event.stopImmediatePropagation();
-        event.stopPropagation();
-        closeCommonMenu();
-        openNativeBreadcrumbTarget(protyle, blockId, false);
-    };
     // 监听器生命周期绑定在 controller 的 AbortController 上：插件卸载或
     // controller 销毁时自动移除，避免原生 bar 上残留旧闭包（重载后仍响应点击）
     breadcrumbBar.addEventListener('click', onNativeItemClick, {capture: true, signal});
     breadcrumbBar.addEventListener('click', onClick, { signal });
-    breadcrumbBar.ownerDocument.addEventListener('click', onMenuClick, {capture: true, signal});
+    registerNativeChildrenMenuProtyle(protyle, signal);
 }

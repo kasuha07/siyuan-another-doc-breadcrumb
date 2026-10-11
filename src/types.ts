@@ -60,6 +60,9 @@ export interface PathObject {
 /** 面包屑完整 ViewModel */
 export interface BreadcrumbModel {
     documentId: string;
+    /** 当前文档所在笔记本与物理路径（/a/b/c.sy），用于判断结构变更的影响范围 */
+    box: string;
+    path: string;
     entries: BreadcrumbEntry[];
     adjacent: AdjacentResult | null;
 }

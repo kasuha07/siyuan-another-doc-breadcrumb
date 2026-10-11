@@ -14,6 +14,7 @@ export interface StateShape {
     g_setting: { [key: string]: any };
     language: { [key: string]: string };
     g_adjacentDocCache: { [key: string]: any };
+    g_settingVersion: number;
 }
 
 export const state: StateShape = {
@@ -41,4 +42,5 @@ export const state: StateShape = {
     },
     language: zh_CN,
     g_adjacentDocCache: {},
+    g_settingVersion: 0,
 };
