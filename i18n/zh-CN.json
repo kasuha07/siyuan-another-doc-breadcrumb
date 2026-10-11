@@ -18,7 +18,7 @@
     "setting_nativeBreadcrumbJump_name": "原生块面包屑左键跳转",
     "setting_nativeBreadcrumbJump_desp": "启用后，点击思源原生块面包屑及其展开层级时滚动跳转到对应位置；右键行为保持思源原有行为。",
     "setting_headingOutlineMenu_name": "文档/标题箭头显示大纲菜单",
-    "setting_headingOutlineMenu_desp": "启用后，文档与标题旁的原生箭头显示仅含标题的大纲菜单。思源 3.8.0 起默认关闭，使用原生完整子块菜单；旧版默认开启。两行模式首个独立文档箭头始终回退到大纲菜单。",
+    "setting_headingOutlineMenu_desp": "启用后，文档与标题旁的原生箭头显示仅含标题的大纲菜单。默认关闭，使用完整子块菜单；两行模式的独立文档箭头同样支持全部子块、分页与懒加载子菜单。",
     "setting_mainRetry_name": "超时重试次数",
     "setting_mainRetry_desp": "如果未能显示，将间隔200ms进行重试。由于新创建的文档未入数据库，该设置对新创建的文档无效。",
     "setting_batchFixFocusError_name": "自动修复错误（批量进行）",

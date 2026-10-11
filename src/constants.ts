@@ -47,7 +47,7 @@ export const g_setting_default = {
     "oneLineBreadcrumb": true,
     "usePluginArrow": true, // 使用挂件>箭头
     "nativeBreadcrumbJump": false, // 原生块面包屑左键跳转，右键保持原有行为
-    "headingOutlineMenu": true, // 布尔类型基准；加载时按思源版本计算实际默认值
+    "headingOutlineMenu": false, // 默认使用思源完整子块菜单，开启后仅显示标题大纲
     "icon": 1,
     "menuExtendSubDocDepth": 2,
     "showRoot": false,
@@ -72,7 +72,7 @@ export let zh_CN: { [key: string]: string } = {
     "setting_nativeBreadcrumbJump_name": "原生块面包屑左键跳转",
     "setting_nativeBreadcrumbJump_desp": "启用后，点击思源原生块面包屑及其展开层级时滚动跳转到对应位置；右键行为保持思源原有行为。",
     "setting_headingOutlineMenu_name": "文档/标题箭头显示大纲菜单",
-    "setting_headingOutlineMenu_desp": "启用后，文档与标题旁的原生箭头显示仅含标题的大纲菜单。思源 3.8.0 起默认关闭，使用原生完整子块菜单；旧版默认开启。两行模式首个独立文档箭头始终回退到大纲菜单。",
+    "setting_headingOutlineMenu_desp": "启用后，文档与标题旁的原生箭头显示仅含标题的大纲菜单。默认关闭，使用完整子块菜单；两行模式的独立文档箭头同样支持全部子块、分页与懒加载子菜单。",
     "createDocFailed": "创建文档失败",
     "previous_doc": "上一篇文档",
     "next_doc": "下一篇文档",

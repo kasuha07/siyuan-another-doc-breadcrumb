@@ -1,5 +1,5 @@
 /**
- * 介入原生块面包屑的“>”箭头：显示文档内标题层级菜单
+ * 原生块面包屑的“>”箭头：可选标题大纲，两行独立文档箭头补齐全部子块菜单
  * 通过 protyle.breadcrumb.element 精确定位原生 bar（不使用模糊 querySelector）。
  * 原生每次 render 都会重写 bar 的 innerHTML，dataset 丢失后此处会重新绑定。
  */
@@ -7,15 +7,16 @@ import { Menu, openTab } from "siyuan";
 import { CONSTANTS } from "./constants";
 import { logPush, errorPush } from "./logger";
 import { state } from "./state";
-import { getDocOutline } from "./api";
-import { escapeHTML, getPluginInstance, stripHTML } from "./utils";
+import { getBlockBreadcrumbChildren, getDocOutline } from "./api";
+import { decodeHtmlEntities, escapeHTML, getPluginInstance, stripHTML } from "./utils";
 import { guardMenuOpen, menuCloseCB, saveLastMenu } from "./menus";
+import type { LazyMenuItem } from "./types";
 
 /**
  * 单次 DFS 遍历 getDocOutline 响应，建立“节点 id → 直接子标题数组”索引：
  * 后续按 id 查找子标题 O(1)，替代原先每次点击对整棵标题树递归探测字段。
  *
- * 响应结构（kernel/model/outline.go OutlineInBox，v3.7.3）为顶级标题的 Path 数组，
+ * 响应结构（kernel/model/outline.go，v3.8.6）为顶级标题的 Path 数组，
  * 直接子标题的存放字段因节点类型而异：
  * - 顶层 Path 节点：blocks（kernel Path.Blocks，[]*Block，json:"blocks,omitempty"）；
  * - 嵌套 Block 节点（标题）：children（kernel Block.Children，[]*Block，json 恒序列化）。
@@ -147,6 +148,173 @@ function closeCommonMenu() {
     (window.siyuan?.menus?.menu as any)?.remove?.();
 }
 
+/** 原生 getIconByType 未向插件导出，仅映射块导航需要的图标。 */
+function getBlockMenuIcon(type: string, subType?: string) {
+    if (type === "NodeHeading") {
+        return subType && /^h[1-6]$/i.test(subType) ? "icon" + subType.toUpperCase() : "iconHeadings";
+    }
+    if (type === "NodeList") {
+        return subType === "t" ? "iconCheck" : subType === "o" ? "iconOrderedList" : "iconList";
+    }
+    const icons: { [type: string]: string } = {
+        NodeDocument: "iconFile", NodeParagraph: "iconParagraph", NodeThematicBreak: "iconLine",
+        NodeBlockquote: "iconQuote", NodeCallout: "iconCallout", NodeTabs: "iconTabs", NodeTabItem: "iconTabItem",
+        NodeListItem: "iconListItem", NodeMindmapItem: "iconListItem", NodeMindmap: "iconMindmap",
+        NodeCodeBlock: "iconCode", NodeYamlFrontMatter: "iconCode", NodeTable: "iconTable",
+        NodeBlockQueryEmbed: "iconSQL", NodeSuperBlock: "iconSuper", NodeMathBlock: "iconMath",
+        NodeHTMLBlock: "iconHTML5", NodeWidget: "iconBoth", NodeCustomBlock: "iconPlugin",
+        NodeIFrame: "iconGlobe", NodeVideo: "iconVideo", NodeAudio: "iconRecord", NodeAttributeView: "iconDatabase",
+    };
+    return icons[type] ?? "iconParagraph";
+}
+
+/** 包含 bar 中的当前路径，以及当前块在已加载编辑器 DOM 中的祖先。 */
+function getCurrentBlockPathIDs(protyle: any, breadcrumbBar: HTMLElement, rootID: string) {
+    const ids = new Set<string>([rootID]);
+    breadcrumbBar.querySelectorAll<HTMLElement>(".protyle-breadcrumb__item[data-node-id]").forEach(item => {
+        ids.add(item.dataset.nodeId!);
+    });
+    const currentID = protyle.breadcrumb?.id;
+    const wysiwyg = protyle.wysiwyg?.element as HTMLElement | undefined;
+    let block = currentID && wysiwyg
+        ? Array.from(wysiwyg.querySelectorAll<HTMLElement>("[data-node-id]")).find(item => item.dataset.nodeId === currentID)
+        : undefined;
+    while (block && wysiwyg?.contains(block)) {
+        ids.add(block.dataset.nodeId!);
+        block = block.parentElement?.closest<HTMLElement>("[data-node-id]") ?? undefined;
+    }
+    return ids;
+}
+
+/**
+ * 两行模式移除了原生文档首项，独立箭头无法由原生 click 识别。
+ * 用同一子块接口与原生 loadSubmenu 补齐导航，不恢复重复文档项。
+ */
+async function openStandaloneDocumentChildrenMenu(protyle: any, arrow: HTMLElement, breadcrumbBar: HTMLElement, signal: AbortSignal) {
+    const rootID = protyle.block.rootID;
+    if (signal.aborted || !arrow.isConnected || !rootID) {
+        return;
+    }
+    const menuId = "bid_" + rootID;
+    if (!guardMenuOpen(menuId)) {
+        return;
+    }
+    // 用对象身份区分同一文档菜单的两次打开，防止旧请求覆盖后来同名菜单。
+    let owner = { menu: null as Menu | null, id: menuId };
+    state.g_relativeMenu = owner;
+    const isActive = () => !signal.aborted && arrow.isConnected
+        && protyle.block.rootID === rootID && state.g_relativeMenu === owner;
+    const cleanup = () => {
+        breadcrumbBar.ownerDocument.removeEventListener("mousedown", onOutsideMousedown, true);
+        signal.removeEventListener("abort", cleanup);
+        if (state.g_relativeMenu === owner && owner.menu === null) {
+            state.g_relativeMenu = null;
+        }
+    };
+    const onOutsideMousedown = (event: MouseEvent) => {
+        if (!(event.target instanceof Node) || !arrow.contains(event.target)) {
+            cleanup();
+        }
+    };
+    breadcrumbBar.ownerDocument.addEventListener("mousedown", onOutsideMousedown, { capture: true, signal });
+    signal.addEventListener("abort", cleanup, { once: true });
+    const currentPathIDs = getCurrentBlockPathIDs(protyle, breadcrumbBar, rootID);
+    const excludeTypes = protyle.element?.classList.contains("card__block") ? ["NodeTextMark-mark"] : [];
+    const rect = arrow.getBoundingClientRect();
+    const position = { x: rect.left, y: rect.bottom, isLeft: false };
+    let menu: Menu;
+
+    const buildItems = async (id: string, offset = 0): Promise<LazyMenuItem[]> => {
+        if (!isActive()) {
+            return [];
+        }
+        const data = await getBlockBreadcrumbChildren({ id, offset, limit: 64, excludeTypes, notebook: protyle.notebookId });
+        if (!isActive()) {
+            return [];
+        }
+        const items: LazyMenuItem[] = data.items.map(item => {
+            const menuItem: LazyMenuItem = {
+                id: item.id,
+                icon: getBlockMenuIcon(item.type, item.subType),
+                // 内核已对 name 做实体转义；先解码再转义，既不双重转义，也不信任 HTML。
+                label: escapeHTML(decodeHtmlEntities(item.name)),
+                current: currentPathIDs.has(item.id),
+                click: () => {
+                    if (isActive()) {
+                        openNativeBreadcrumbTarget(protyle, item.id, !isNativeBreadcrumbJumpEnabled());
+                    }
+                },
+            };
+            if (item.hasChildren) {
+                menuItem.loadSubmenu = () => buildItems(item.id);
+            }
+            return menuItem;
+        });
+        if (data.hasMore && data.items.length > 0) {
+            items.push({
+                icon: "iconMore",
+                label: escapeHTML(window.siyuan.languages!.loadMore),
+                click: element => {
+                    if (!isActive() || !element.isConnected || element.hasAttribute("disabled")) {
+                        return true;
+                    }
+                    element.setAttribute("disabled", "disabled");
+                    buildItems(id, offset + data.items.length).then(nextItems => {
+                        if (!isActive() || !element.isConnected) {
+                            return;
+                        }
+                        // SDK addItem 返回原生 MenuItem 元素：创建后移到当前层的
+                        // “加载更多”前，兼容首层与懒加载子层，无需手工拼 DOM。
+                        let firstNext: HTMLElement | undefined;
+                        nextItems.forEach(item => {
+                            const nextElement = menu.addItem(item);
+                            firstNext ??= nextElement;
+                            element.before(nextElement);
+                        });
+                        const moveCurrent = element.classList.contains("b3-menu__item--current");
+                        const submenu = element.closest<HTMLElement>(".b3-menu__submenu");
+                        element.remove();
+                        if (moveCurrent && firstNext) {
+                            firstNext.classList.add("b3-menu__item--current");
+                            firstNext.scrollIntoView({ block: "nearest" });
+                        }
+                        // 使用 SDK 公开接口按新增内容重算所在层的位置。
+                        if (submenu) {
+                            menu.showSubMenu(submenu);
+                        } else {
+                            menu.open(position);
+                        }
+                    }).catch(error => {
+                        errorPush("加载更多子块失败", error);
+                        if (isActive() && element.isConnected) {
+                            element.removeAttribute("disabled");
+                        }
+                    });
+                    // 必须同步返回 true，异步回调会被原生按“关闭菜单”处理。
+                    return true;
+                },
+            });
+        }
+        return items;
+    };
+
+    try {
+        const items = await buildItems(rootID);
+        if (!isActive() || items.length === 0) {
+            return;
+        }
+        menu = new Menu("og-fdb-relative-menu", menuCloseCB);
+        items.forEach(item => menu.addItem(item));
+        menu.open(position);
+        saveLastMenu(menu, menuId);
+        owner = state.g_relativeMenu;
+    } catch (error) {
+        errorPush("获取子块面包屑菜单失败", error);
+    } finally {
+        cleanup();
+    }
+}
+
 export function addBlockBdMenuListener(protyle: any, signal: AbortSignal) {
     // 限制范围，避免影响插件插入的面包屑
     const breadcrumbBar = protyle?.breadcrumb?.element;
@@ -157,7 +325,6 @@ export function addBlockBdMenuListener(protyle: any, signal: AbortSignal) {
         return;
     }
     breadcrumbBar.dataset["ogFdbAddedEl"] = "true";
-    const docId = protyle.block.rootID;
     const onNativeItemClick = (event: MouseEvent) => {
         const item = getNativeBreadcrumbItem(event.target, breadcrumbBar);
         if (!item) {
@@ -180,6 +347,7 @@ export function addBlockBdMenuListener(protyle: any, signal: AbortSignal) {
         if (nativeArrowClickBypass.delete(arrowElement)) {
             return;
         }
+        const docId = protyle.block.rootID;
         // 获取箭头左侧的面包屑项目
         const precedingItem = arrowElement.previousElementSibling;
         const standaloneDocumentBridge = !precedingItem
@@ -191,9 +359,14 @@ export function addBlockBdMenuListener(protyle: any, signal: AbortSignal) {
             logPush("未找到箭头左侧的面包屑项目。");
             return;
         }
-        // 两行模式移除了原生文档首项，独立箭头没有 previousElementSibling，
-        // 原生无法识别，始终回退到插件大纲；其余箭头由设置决定是否介入。
-        if (state.g_setting.headingOutlineMenu !== true && !standaloneDocumentBridge) {
+        // 关闭大纲时，普通箭头交还原生；独立文档箭头补齐全部子块菜单。
+        if (state.g_setting.headingOutlineMenu !== true) {
+            if (standaloneDocumentBridge) {
+                event.stopImmediatePropagation();
+                event.stopPropagation();
+                event.preventDefault();
+                await openStandaloneDocumentChildrenMenu(protyle, arrowElement, breadcrumbBar, signal);
+            }
             return;
         }
         // 同行模式桥接箭头前的插件当前项只有 data-node-id，没有 popover 图标。

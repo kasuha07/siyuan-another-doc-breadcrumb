@@ -1,7 +1,7 @@
 /**
  * 文档面包屑插件（siyuan-another-doc-breadcrumb）
  *
- * v2.0.0 重构（仅支持思源 v3.7.0+）：
+ * v2.0.0 重构（仅支持思源 v3.8.0+）：
  * - 同行模式：插件内容容器 `.og-fdb-inline-breadcrumb` 作为原生
  *   `.protyle-breadcrumb__bar` 的第一个 flex 子项插入（原生内容之前），
  *   原生 bar、space、右侧按钮的 DOM 与直接父子关系保持不变。
@@ -28,15 +28,7 @@ import { generateSettingPanel, loadUISettings, SettingProperty } from "./setting
 import { destroyAllControllers } from "./controller";
 import { removeAdjacentTooltip } from "./adjacent";
 import { eventBusHandler, handleDestroyProtyle, mainEventBusHander, refreshAllShowingProtyles, resetEventState } from "./events";
-import { isCurrentVersionLessThan, isMobile, isSomePluginExist, sleep } from "./utils";
-
-/**
- * 未保存过大纲开关时按运行时版本取默认值；不在模块加载阶段访问 window。
- * 新增布尔键不需要升配置版本，已有显式选择（含 false）始终优先。
- */
-function getSettingDefaults() {
-    return { ...g_setting_default, headingOutlineMenu: isCurrentVersionLessThan("3.8.0") };
-}
+import { isMobile, isSomePluginExist, sleep } from "./utils";
 
 /**
  * 校验 loadData 原始载荷是否为有效配置对象：
@@ -96,7 +88,8 @@ export class FakeDocBreadcrumb extends Plugin {
         state.language = this.i18n;
         state.g_pluginInstance = this;
         // 读取配置
-        Object.assign(state.g_setting, getSettingDefaults());
+        // 缺失键使用静态默认值；载入配置时已保存的显式布尔值仍优先。
+        Object.assign(state.g_setting, g_setting_default);
         // 冲突插件强制同行模式（onload 早期应用一次，配置加载/保存后由
         // applyConflictPluginOverride 再次强制，防止被磁盘配置绕过）
         this.applyConflictPluginOverride();
@@ -141,7 +134,7 @@ export class FakeDocBreadcrumb extends Plugin {
             // 需先转换为新枚举，否则会被按当前 string 类型误判为非法剔除
             let migrated = false;
             if (settingCache["@version"] === undefined || settingCache["@version"] < g_setting_default["@version"]) {
-                const merged: { [key: string]: any } = getSettingDefaults();
+                const merged: { [key: string]: any } = { ...g_setting_default };
                 for (const key of Object.keys(g_setting_default)) {
                     if (key in settingCache && settingCache[key] !== undefined) {
                         merged[key] = settingCache[key];

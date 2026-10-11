@@ -5,7 +5,6 @@ import { debugPush } from "./logger";
 import { CONSTANTS } from "./constants";
 import { state } from "./state";
 import { getNodebookList, listDocsByPath, openRefLinkByAPI } from "./api";
-import { trimListDocsByPathAPIReturnedDocName } from "./utils";
 import type { ActionRegistrar, AdjacentResult, PathObject } from "./types";
 
 /**
@@ -105,7 +104,7 @@ export function createAdjacentDocButton(direction: string, doc: any, isSameLevel
     let buttonText = label;
 
     if (doc?.id) {
-        const docName = trimListDocsByPathAPIReturnedDocName(doc?.name ?? "");
+        const docName = doc?.name ?? "";
         const trimedDocName = trimDocName(docName, state.g_setting.nameMaxLength);
         buttonText = docName;
         const actionKey = controller.registerAction({

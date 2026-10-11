@@ -11,7 +11,7 @@ import { saveLayout } from "siyuan";
 import { CONSTANTS } from "./constants";
 import { debugPush, errorPush, warnPush } from "./logger";
 import { state } from "./state";
-import { isCurrentVersionLessThan, isNotebookDocEnabled, isValidStr } from "./utils";
+import { isNotebookDocEnabled, isValidStr } from "./utils";
 import { openRefLinkAgent } from "./api";
 import { buildDocumentBreadcrumbModel } from "./model";
 import { renderBreadcrumbFragment, createBreadcrumbArrow } from "./render";
@@ -337,9 +337,7 @@ export class InlineBreadcrumbController {
         // v3.8.0 起原生也在同一 bar 上监听右键/键盘，且注册早于插件。
         // 捕获阶段仅隔离插件 action，不影响桥接进 root 的原生块箭头。
         eventTarget.addEventListener("contextmenu", this.handleContextMenu, { signal, capture: true });
-        if (!isCurrentVersionLessThan("3.8.0")) {
-            eventTarget.addEventListener("keydown", this.handleKeyDown, { signal, capture: true });
-        }
+        eventTarget.addEventListener("keydown", this.handleKeyDown, { signal, capture: true });
 
         if (!this.nativeBar) {
             // 两行模式：插件根节点自身滚动，处理滚轮；

@@ -12,6 +12,7 @@ import { Constants, openTab, showMessage } from "siyuan";
 import * as siyuan from "siyuan";
 import { debugPush, errorPush, logPush, warnPush } from "./logger";
 import { state } from "./state";
+import type { BlockBreadcrumbChildren, ChildDocument } from "./types";
 import { getCurrentDocIdF, getPluginInstance, isEventCtrlKey, isMobile, isValidStr, sleep } from "./utils";
 
 export function getNotebooks() {
@@ -99,18 +100,32 @@ export async function getNotebookInfo(notebookId: string) {
     return null;
 }
 
-export async function getChildDocuments(docId: string, sqlResult: any[]) {
+export async function getChildDocuments(docId: string, sqlResult: Array<{ path: string; box: string }>): Promise<ChildDocument[]> {
     let childDocs = await listDocsByPath({ path: sqlResult[0].path, notebook: sqlResult[0].box });
-    if (!childDocs) {
-        // listDocsByPath 对未挂载（closed，含锁定中的加密笔记本）返回 code!=0 → null，
-        // 直接返回空数组而非抛 TypeError（原实现会解引用 null 由调用方 catch，报错信息误导）；
-        // 调用方（菜单懒加载）已有加载失败提示与重试逻辑，此处静默降级为“无子文档”。
-        return [];
+    if (!childDocs || !Array.isArray(childDocs.files)) {
+        // 失败与成功空列表分开：首层由 openRelativeMenu 捕获，子层交给原生
+        // loadSubmenu 的 reject 分支显示占位并允许再次加载。
+        throw new Error(`getChildDocuments Failed: ${docId}`);
     }
     if (childDocs.files.length > state.g_setting.docMaxNum && state.g_setting.docMaxNum != 0) {
         childDocs.files = childDocs.files.slice(0, state.g_setting.docMaxNum);
     }
     return childDocs.files;
+}
+
+/** 思源 3.8.0+ 的全部子块导航接口，失败时让菜单调用方决定如何呈现。 */
+export async function getBlockBreadcrumbChildren(options: {
+    id: string;
+    offset: number;
+    limit: number;
+    excludeTypes: string[];
+    notebook: string;
+}): Promise<BlockBreadcrumbChildren> {
+    const response = await request("/api/block/getBlockBreadcrumbChildren", options);
+    if (response?.code !== 0 || !Array.isArray(response.data?.items)) {
+        throw new Error("getBlockBreadcrumbChildren Failed: " + (response?.msg ?? "请求失败"));
+    }
+    return response.data;
 }
 
 /**
@@ -485,5 +500,4 @@ export async function fillNotebookDocFileInfo(notebookList: any[]) {
     const result = await Promise.all(promiseList);
     return result.filter((doc) => doc !== null);
 }
-
 

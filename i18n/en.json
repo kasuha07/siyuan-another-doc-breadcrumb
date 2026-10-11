@@ -18,7 +18,7 @@
     "setting_nativeBreadcrumbJump_name": "Left-click navigation for the native block breadcrumb",
     "setting_nativeBreadcrumbJump_desp": "When enabled, clicking the native block breadcrumb or its expanded hierarchy scrolls to the corresponding position; right-click behavior remains unchanged.",
     "setting_headingOutlineMenu_name": "Show outline menus for document/heading arrows",
-    "setting_headingOutlineMenu_desp": "Show heading-only outline menus for native document and heading arrows. Disabled by default on SiYuan 3.8.0+ to use native menus with all child blocks; enabled by default on older versions. The standalone document arrow in two-line mode always falls back to the outline menu.",
+    "setting_headingOutlineMenu_desp": "Show heading-only outline menus for native document and heading arrows. Disabled by default to use menus with all child blocks. The standalone document arrow in two-line mode also supports all child blocks, pagination and lazy submenus.",
     "setting_mainRetry_name": "Retry times",
     "setting_mainRetry_desp": "If unable to display, retry specified number of times with an interval of 200ms.",
     "setting_icon_name": "Sub menu document Icon",

@@ -18,8 +18,8 @@
 - Add the current document navigation path above the editor;
 - Click to jump to the corresponding document, right-click to expand the sub-documents of that document;
 - (Setting) Enable "Left-click navigation for the native block breadcrumb" to scroll to the corresponding position from the native block breadcrumb and its expanded hierarchy; right-click behavior remains unchanged (disabled by default);
-- (Setting) "Show outline menus for document/heading arrows" shows heading-only menus for native document and heading arrows. Disabled by default on SiYuan v3.8.0+ to use native child-block navigation, including pagination and lazy submenus; enabled by default on v3.7.x. Saved choices are preserved. The standalone document arrow in two-line mode always falls back to the outline menu because its native document item has been removed;
-- On SiYuan v3.8.0+, use Enter / Space to activate plugin path buttons, ArrowDown to open their sub-document menu, and ArrowLeft / ArrowRight to move between path items (including across the plugin/native boundary in one-line mode);
+- (Setting) "Show outline menus for document/heading arrows" shows heading-only menus for native document and heading arrows. Disabled by default to use child-block navigation, including pagination and lazy submenus, in both one-line and two-line modes. Saved choices are preserved;
+- Use Enter / Space to activate plugin path buttons, ArrowDown to open their sub-document menu, and ArrowLeft / ArrowRight to move between path items (including across the plugin/native boundary in one-line mode);
 - (Setting) The sub-document menu supports further expansion according to the hierarchy, up to 7 levels;
 - (Setting) When the hierarchy exceeds 5 levels, the first 2 levels and the last 3 levels are retained by default;
 - (Setting) Show previous/next document buttons on the right side of the breadcrumb;
@@ -30,7 +30,7 @@
 
 - No support for Android or other mobile Device;
 - You can browse the settings on the plugin settings page. Just a tip, the settings page can be scrolled up and down.
-- Requires SiYuan v3.7.0+;
+- Requires SiYuan v3.8.0+;
 - With "Display the document breadcrumb on the same line as the block breadcrumb" enabled, the two breadcrumbs share one line and scroll horizontally as one continuous strip when overflowing; otherwise the document breadcrumb stays on its own line above the block breadcrumb.
 
 ## Differences from upstream
@@ -47,10 +47,10 @@ This fork diverges from upstream `syplugin-fakeDocBreadcrumb` (v1.5.1; upstream 
   - "Show in more cases", "Hide while typing", "Swap left/right click actions", and the "Scroll hint" (scroll for more settings) hint item.
 - **Promoted to stable**: "Open in the split-screen area of the breadcrumb", "Extended sub-document menu levels" (up to 7), "Create document button in menu" (on by default).
 - **New settings**: Left-click navigation for the native block breadcrumb (disabled by default; right-click behavior unchanged); previous/next button style options (text / arrow only); "Open previous/next in the current tab" (disabled by default).
-- **Stability & performance**: lazy submenu loading via container-level event delegation (upstream uses one MutationObserver per item); breadcrumb collapsing via binary search (reflow O(n) → O(log n)); document structure changes batched into one refresh per 100 ms window, eliminating request bursts on bulk moves; deduplicated open-document events; batch `getDocsInfo` instead of per-level lookups; init retries (up to 5) with fallback to default settings; unified fetch error handling with null fallbacks.
+- **Stability & performance**: lazy submenu loading via native `IMenu.loadSubmenu`, with native loading states, positioning and keyboard focus (upstream uses one MutationObserver per item); breadcrumb collapsing via binary search (reflow O(n) → O(log n)); document structure changes batched into one refresh per 100 ms window, eliminating request bursts on bulk moves; deduplicated open-document events; batch `getDocsInfo` instead of per-level lookups; init retries (up to 5) with fallback to default settings; unified fetch error handling with null fallbacks.
 - **Security**: document names and icons are escaped before being inserted into menu HTML (two XSS vectors closed).
 - **Lifecycle**: full cleanup on `destroy-protyle` — no leftover nodes after unload; settings saves rebuild only what changed; styles are injected via the official `pluginsStyle` mechanism and removed automatically on unload.
-- **Other**: One-line mode reuses the native SiYuan arrow and removes the duplicated native current-document item; removed the external debug protocol (`OpaqueGlassDebugV2`) dependency; three undocumented SiYuan dependencies (tab-close chain, outline API fields, encrypted-notebook `closed` semantics) verified against the v3.7.3 source and documented.
+- **Other**: One-line mode reuses the native SiYuan arrow and removes the duplicated native current-document item; removed the external debug protocol (`OpaqueGlassDebugV2`) dependency; three undocumented SiYuan dependencies (tab-close chain, outline API fields, encrypted-notebook `closed` semantics) verified against the v3.8.6 source and documented.
 
 ## Feedback bugs
 
